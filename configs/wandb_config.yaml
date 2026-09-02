@@ -1,0 +1,109 @@
+# configs/wandb_config.yaml
+# Member 4 — Weights & Biases experiment tracking configuration
+# Added in Step 3 (M4): Add wandb_config.yaml and tracking setup docs.
+#
+# Usage:
+#   import yaml, wandb
+#   cfg = yaml.safe_load(open("configs/wandb_config.yaml"))
+#   wandb.init(**cfg["init"])
+#
+# All fields match the wandb.init() signature. Override via environment
+# variables (WANDB_PROJECT, WANDB_ENTITY, WANDB_MODE) in CI or cluster runs.
+
+init:
+  # -----------------------------------------------------------------
+  # Project & team
+  # -----------------------------------------------------------------
+  project: "RL-for-Self-Improving-Cyber-LLMs"
+  entity: null          # set to your W&B team/username or WANDB_ENTITY env-var
+  name: null            # auto-generated run name unless overridden per-script
+
+  # -----------------------------------------------------------------
+  # Tags applied to every run; individual scripts append phase-specific tags
+  # -----------------------------------------------------------------
+  tags:
+    - capstone
+    - defender-policy
+    - mappo
+
+  # -----------------------------------------------------------------
+  # Experiment notes template (overridden per run)
+  # -----------------------------------------------------------------
+  notes: "Automated run — see run_metadata in uploaded JSON artifact for full provenance."
+
+  # -----------------------------------------------------------------
+  # Offline / disabled mode for environments without internet access
+  # Set mode: "disabled" to suppress all W&B calls during unit tests.
+  # Set mode: "offline" to queue syncs for later upload.
+  # -----------------------------------------------------------------
+  mode: "online"        # online | offline | disabled
+
+  # -----------------------------------------------------------------
+  # Artifact & directory settings
+  # -----------------------------------------------------------------
+  dir: "reports"        # local W&B run directory (inside reports/)
+  save_code: false      # set true on final review runs to archive source
+
+  # -----------------------------------------------------------------
+  # Resuming interrupted runs
+  # -----------------------------------------------------------------
+  resume: "allow"       # allow | must | never | auto
+
+# -----------------------------------------------------------------
+# What to log — consumed by tracking_utils.py
+# -----------------------------------------------------------------
+logging:
+  # Scalar metrics logged every episode / evaluation step
+  scalars:
+    - attack_success_rate
+    - benign_task_success_rate
+    - false_refusal_rate
+    - tool_block_rate
+    - avg_total_reward
+    - retention_score
+    - kl_divergence
+    - entropy
+    - critic_loss
+    - policy_loss
+
+  # Per-review artifact names uploaded after each script run
+  artifacts:
+    review1:
+      - reports/review1_baseline_metrics.json
+      - reports/review1_traces.json
+    review2:
+      - reports/review2_episode_report.json
+      - reports/review2_integration_summary.json
+    review3:
+      - reports/capability_retention_fixture_baseline.json
+      - reports/capability_retention_fixture_baseline.csv
+      - reports/checkpoint_eval_fixture_baseline.json
+      - reports/review3_readiness_summary.json
+
+  # Leak-detection summary logged as a W&B Table after each run
+  leak_detection:
+    log_table: true
+    table_name: "leak_detector_results"
+    columns:
+      - sample_id
+      - pattern_matched
+      - severity
+      - flagged
+
+# -----------------------------------------------------------------
+# Sweep defaults (used if a W&B sweep is launched for ablations)
+# -----------------------------------------------------------------
+sweep:
+  method: "grid"
+  metric:
+    name: "attack_success_rate"
+    goal: "minimize"
+  parameters:
+    beta_kl:
+      values: [0.0, 0.1, 1.0]        # ablation_no_kl / sft_warmup / ablation_high_kl
+    lambda_violation:
+      values: [1.0]
+    lambda_refusal:
+      values: [0.3]
+    seed:
+      values: [42]

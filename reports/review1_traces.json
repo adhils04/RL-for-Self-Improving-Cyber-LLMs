@@ -1,7 +1,7 @@
 {
   "scope": "Five canonical Review 1 sanitized traces \u2014 fixture baseline only.",
   "disclaimer": "These traces are produced by a deterministic rule-based fixture baseline, not by a trained LLM. They validate the enforcement environment only.",
-  "generated_at": "2026-08-26T14:40:02.392757+00:00",
+  "generated_at": "2026-09-02T10:37:57.464397+00:00",
   "traces": [
     {
       "trace_id": "T1_safe_answer",
