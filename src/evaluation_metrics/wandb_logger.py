@@ -249,6 +249,14 @@ class CoevolutionWandbLogger:
             "gate_block_count": episode_result.gate_block_count,
         })
 
+    def log_metrics(
+        self,
+        metrics: Dict[str, Any],
+        step: Optional[int] = None,
+    ) -> None:
+        """Log arbitrary scalar metrics dictionary to W&B tracker."""
+        log_scalar_dict(self._tracker, metrics, step=step or self._global_step)
+
     # ------------------------------------------------------------------
     # Bulk step logging (for post-hoc logging from script)
     # ------------------------------------------------------------------

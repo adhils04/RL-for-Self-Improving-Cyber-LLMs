@@ -21,6 +21,13 @@ SFT and MAPPO training remain BLOCKED_EXTERNAL.
   - `reports/review3_readiness_summary.json`: machine-readable readiness record — all 12 deliverables (READY or BLOCKED_EXTERNAL), fixture baseline metrics (in-dist + OOD + retention), full ablation plan with hypotheses, interface readiness (Member 1/3/4 PENDING), 7-step run instructions for when training is unblocked.
   - `docs/defender-review3-evidence.md`: full Review 3 presentation — 5-slice evaluation matrix, metric comparison tables (SFT/MAPPO BLOCKED_EXTERNAL), per-family ASR, capability retention table, 8-probe per-category rates, ablation plan with no-gate NOT_RUN rationale, end-to-end run instructions, interface readiness, 284-test coverage table, 9 generated reports indexed, 6 open blockers.
   - All 284 tests still pass.
+- **Review 2 MAPPO Co-evolution Training Pipeline (2026-09-18):**
+  - Resolved 10 runtime and interface bugs in `scripts/run_mappo_coevolution.py`.
+  - Integrated `CentralizedCritic`, `AttackerPolicy`, `CoevolutionEnv`, and `CoevolutionWandbLogger`.
+  - Added periodic and final checkpointing into `checkpoints/mappo_run`.
+  - Integrated `ATTACK_CATEGORIES` and `ATTACK_TEMPLATES` from `src/attacker_policy/attack_generator.py`.
+  - Added `log_metrics()` method to `CoevolutionWandbLogger`.
+  - 430/430 tests passing. Full 1-episode smoke test verified successfully.
 
 ## In progress
 
@@ -28,20 +35,15 @@ Nothing in progress.
 
 ## Next exact action
 
-All three review phases are now complete as fixture infrastructure.
-The project is in HOLDING state pending:
-1. Team confirmation of base LLM checkpoint and training stack → unblocks SFT warm-up.
-2. Member 1 AttackPayload schema → unblocks MAPPO self-play.
-3. Member 3 Trajectory/Critic schema → unblocks advantage computation.
-4. Member 4 EvaluationEvent/OOD suite → unblocks Review 3 held-out evaluation.
-
-When any blocker clears, resume from the corresponding step in
-`reports/review3_readiness_summary.json § how_to_run_once_unblocked`.
+All Review 2 integration and training contracts are functional and verified.
+1. Run `python3 scripts/run_mappo_coevolution.py` for full 500-episode co-evolution training on CUDA GPU.
+2. Evaluate checkpoints via `scripts/evaluate_checkpoint.py`.
 
 ## Latest verification
 
-- Command: `python3 -m unittest discover -s tests -v`
-- Result: 284 tests passed, 0 failed.
+- Command: `PYTHONPATH=. python3 -m pytest`
+- Result: 430 tests passed, 0 failed.
+- MAPPO smoke test: `run_mappo_coevolution.py` runs end-to-end (1 episode verified).
 - Scripts: all 6 scripts exit 0 (dry-run verified):
   - `prepare_sft.py --dry-run`
   - `run_review1_baseline.py --dry-run`

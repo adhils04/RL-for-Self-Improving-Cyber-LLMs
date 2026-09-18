@@ -151,3 +151,50 @@ def test_dynamic_attack_is_saved(tmp_path):
     ).strip()
 
     assert len(content) > 0
+
+
+def test_encode_obs():
+    from scripts.run_mappo_coevolution import encode_obs
+
+    # Correct shape and type
+    t1 = encode_obs("task_abc", state_dim=8)
+    assert isinstance(t1, torch.Tensor)
+    assert t1.shape == (8,)
+    assert t1.dtype == torch.float32
+
+    # Deterministic
+    t2 = encode_obs("task_abc", state_dim=8)
+    assert torch.equal(t1, t2)
+
+    # Different tasks yield different representations
+    t3 = encode_obs("task_xyz", state_dim=8)
+    assert not torch.equal(t1, t3)
+
+    # Custom state dimensions
+    t_dim12 = encode_obs("task_abc", state_dim=12)
+    assert t_dim12.shape == (12,)
+
+
+def test_get_attack_payload():
+    from scripts.run_mappo_coevolution import get_attack_payload
+
+    for idx in range(10):
+        payload = get_attack_payload(idx)
+        assert isinstance(payload, str)
+        assert len(payload) > 10
+
+
+def test_wandb_logger_log_metrics(tmp_path):
+    from src.evaluation_metrics.wandb_logger import CoevolutionWandbLogger
+
+    logger = CoevolutionWandbLogger(output_dir=tmp_path, mode="disabled")
+    logger.init()
+    logger.log_metrics({
+        "episode": 1,
+        "episode_reward_attacker": 1.0,
+        "episode_reward_defender": -1.0,
+        "critic_loss": 0.05,
+    })
+    logger.finish()
+    reports = list(tmp_path.glob("*.json"))
+    assert len(reports) >= 1
