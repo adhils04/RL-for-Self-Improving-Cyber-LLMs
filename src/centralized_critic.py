@@ -9,23 +9,24 @@ class CentralizedCritic(nn.Module):
     The 'God's Eye' Value Network for MAPPO. 
     Observes the global state S and predicts a scalar Value V(S) to guide the actors.
     """
-    def __init__(self, model_name_or_path, device="cuda"):
+    def __init__(self, model_name_or_path, device="cuda", lr: float = 1e-5):
         super(CentralizedCritic, self).__init__()
         self.device = device
-        
+
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False)
         # Ensure padding token exists for batch processing
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
-            
+
         # num_labels=1 converts the transformer into a regression model outputting a scalar
         self.model = AutoModelForSequenceClassification.from_pretrained(
-            model_name_or_path, 
-            num_labels=1,           
-            torch_dtype=torch.float16
+            model_name_or_path,
+            num_labels=1,
+            torch_dtype=torch.float16,
         ).to(self.device)
-        
-        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=1e-5)
+
+        # Bug fix #10: lr is now config-driven (default kept for backward compat)
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr)
         self.loss_fn = nn.MSELoss()
 
     def forward(self, global_states_text):
