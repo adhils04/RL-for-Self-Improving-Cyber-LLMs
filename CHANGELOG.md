@@ -94,3 +94,19 @@
 - `docs/defender-review3-evidence.md`: full Review 3 presentation — 5-slice evaluation matrix, metric tables (BLOCKED_EXTERNAL placeholders), per-family ASR, capability retention table (8 probes, 6 categories), ablation plan with no-gate NOT_RUN rationale, end-to-end instructions, interface readiness, 284-test coverage, 9 reports indexed, 6 blockers.
 - All 284 tests pass. All scripts exit 0. All three review phases complete as fixture infrastructure.
 - Project in HOLDING state pending base model confirmation and Member 1/3/4 schemas.
+
+## 2026-09-18 - Review 2 MAPPO Co-evolution Training Pipeline & Integration
+
+- `scripts/run_mappo_coevolution.py`:
+  - Resolved 10 runtime bugs (observation tensor encoding via `encode_obs()`, unpacking `AttackDecision`, unified payload mapping, `EnvStepResult` rewards, `CentralizedCritic` config-driven `critic_lr`, `ppo_epochs` training loop, `CTDETrajectoryBuffer` tensor storage).
+  - Integrated `ATTACK_CATEGORIES` and `ATTACK_TEMPLATES` from `src/attacker_policy/attack_generator.py`.
+  - Added periodic and final model checkpointing for attacker and centralized critic.
+  - Added step-level and episode-level metric logging via `CoevolutionWandbLogger`.
+  - Safe CUDA device selection with automatic CPU fallback.
+- `configs/mappo_config.yaml`:
+  - Configured 500 episodes, 6 steps per episode, tuned critic lr (`0.00002`), max grad norm (`0.5`), explicit `checkpoint_dir` (`checkpoints/mappo_run`), `wandb_mode: disabled`, and `output_dir: reports`.
+- `src/evaluation_metrics/wandb_logger.py`:
+  - Added `log_metrics()` method to safely record arbitrary scalar dictionaries to W&B tracker.
+- `tests/test_mappo_attacker.py`:
+  - Added unit tests for `encode_obs`, `get_attack_payload`, and `CoevolutionWandbLogger.log_metrics()`.
+  - All 430 tests passing.
