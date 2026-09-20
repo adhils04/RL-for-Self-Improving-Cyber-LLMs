@@ -143,9 +143,10 @@ def main(config_path=None):
             state_tensor = encode_obs(task_desc, state_dim=state_dim)
 
             # B. Attacker action selection
-            decision      = attacker.get_action(state_tensor)
+            with torch.no_grad():
+                decision      = attacker.get_action(state_tensor)
             atk_action_idx = decision.action               # int (0–4)
-            atk_logprob    = decision.log_prob             # torch.Tensor scalar
+            atk_logprob    = decision.log_prob.detach()    # torch.Tensor scalar
 
             # C. Map action index → injection string using unified attack categories & templates
             atk_text = get_attack_payload(atk_action_idx)
@@ -205,7 +206,7 @@ def main(config_path=None):
         # ── Convert buffer lists to tensors for attacker ─────────────────────
         atk_states   = torch.stack(buffer.attacker_obs)                          # (T, state_dim)
         atk_actions  = torch.tensor(buffer.attacker_actions, dtype=torch.long)   # (T,)
-        atk_logprobs = torch.stack(buffer.attacker_logprobs)                     # (T,)
+        atk_logprobs = torch.stack(buffer.attacker_logprobs).detach()            # (T,)
 
         atk_loss = 0.0
         def_loss = 0.0
