@@ -61,7 +61,10 @@ class CTDETrajectoryBuffer:
         
         # Return as normalized PyTorch tensors for stable training
         adv_tensor = torch.tensor(advantages, dtype=torch.float32)
-        adv_normalized = (adv_tensor - adv_tensor.mean()) / (adv_tensor.std() + 1e-8)
+        if len(adv_tensor) > 1:
+            adv_normalized = (adv_tensor - adv_tensor.mean()) / (adv_tensor.std(unbiased=False) + 1e-8)
+        else:
+            adv_normalized = torch.zeros_like(adv_tensor)
         
         return torch.tensor(returns, dtype=torch.float32), adv_normalized
 
