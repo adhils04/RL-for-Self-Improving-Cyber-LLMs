@@ -1,0 +1,31 @@
+# configs/ablation_configs/ablation_independent_ppo.yaml
+
+experiment:
+  name: "independent_ppo_ablation"
+  seed: 42
+  num_episodes: 500
+  max_steps_per_episode: 6
+
+training:
+  gamma: 0.99
+  gae_lambda: 0.95
+  ppo_epochs: 4
+  clip_epsilon: 0.2
+  critic_lr: 0.00002
+  actor_lr: 0.00002
+  max_grad_norm: 0.5
+  mini_batch_size: 4
+  use_centralized_critic: false # <--- KEY DIFFERENCE: Disables CTDE, forcing local state learning
+
+models:
+  critic_model: "distilbert-base-uncased"
+  attacker_state_dim: 8
+  attacker_action_dim: 5
+  device: "cuda"
+
+logging:
+  wandb_project: "mappo-sec-defense"
+  wandb_mode: "disabled"
+  log_interval: 20
+  checkpoint_dir: "checkpoints/independent_ppo_run"
+  output_dir: "reports"

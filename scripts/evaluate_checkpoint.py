@@ -47,7 +47,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--allow-heldout", action="store_true",
         help=(
-            "Enable held-out OOD evaluation. "
+            "Enable held-out OOD evaluation using data/evaluation/heldout_cases.jsonl. "
             "Use ONLY at final Review 3 — not during hyperparameter search."
         ),
     )
