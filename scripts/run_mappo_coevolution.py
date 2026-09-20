@@ -292,4 +292,8 @@ def main(config_path=None):
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description="Run MAPPO Co-evolution Training")
+    parser.add_argument("--config", type=str, default=None, help="Path to custom config YAML file.")
+    args = parser.parse_args()
+    main(config_path=args.config)
