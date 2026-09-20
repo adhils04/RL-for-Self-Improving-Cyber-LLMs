@@ -1,0 +1,51 @@
+{
+  "os":  "Linux-6.12.90+-x86_64-with-glibc2.35",
+  "python":  "CPython 3.12.13",
+  "startedAt":  "2026-09-20T07:25:23.082236Z",
+  "args":  [
+    "--config",
+    "configs/mappo_config.yaml"
+  ],
+  "program":  "/kaggle/working/RL-for-Self-Improving-Cyber-LLMs/scripts/run_mappo_coevolution.py",
+  "codePath":  "scripts/run_mappo_coevolution.py",
+  "codePathLocal":  "scripts/run_mappo_coevolution.py",
+  "git":  {
+    "remote":  "https://github.com/subhojeetchanda/RL-for-Self-Improving-Cyber-LLMs.git",
+    "commit":  "367d149f85fc7316a274f90e32a4a446dfbe82d5"
+  },
+  "email":  "subhojeetchanda18@gmail.com",
+  "root":  "reports",
+  "host":  "af575ea3a2e4",
+  "executable":  "/usr/bin/python3",
+  "cpu_count":  2,
+  "cpu_count_logical":  4,
+  "gpu":  "Tesla T4",
+  "gpu_count":  2,
+  "disk":  {
+    "/":  {
+      "total":  "8656922775552",
+      "used":  "7557162741760"
+    }
+  },
+  "memory":  {
+    "total":  "33659375616"
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "Tesla T4",
+      "memoryTotal":  "16106127360",
+      "cudaCores":  2560,
+      "architecture":  "Turing",
+      "uuid":  "GPU-ea1eea89-ac8a-cede-4bf1-a02fa94d0b37"
+    },
+    {
+      "name":  "Tesla T4",
+      "memoryTotal":  "16106127360",
+      "cudaCores":  2560,
+      "architecture":  "Turing",
+      "uuid":  "GPU-e7465edd-5586-c7d3-4787-f4119adface8"
+    }
+  ],
+  "cudaVersion":  "13.0",
+  "writerId":  "3t07bjtl8c3tzmslku6tvvd1qokif738"
+}

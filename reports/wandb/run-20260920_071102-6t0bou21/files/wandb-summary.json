@@ -1,0 +1,1 @@
+{"_wandb":{"runtime":3},"gate_block_rate":0,"episode_reward_defender":0,"attacker_reward":-1,"_timestamp":1.789888267011447e+09,"_step":4,"kl_divergence":0,"_runtime":3.164672852,"attack_success_rate":0,"defender_reward":0,"critic_loss":NaN,"episode_reward_attacker":-2,"attacker_loss":0,"episode":2,"pre_gate_unsafe_rate":0,"defender_loss":NaN}

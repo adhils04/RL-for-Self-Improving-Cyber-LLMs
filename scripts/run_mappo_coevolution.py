@@ -116,8 +116,10 @@ def main(config_path=None):
     )
 
     # Initialize W&B logger
+    run_name = config.get("logging", {}).get("wandb_run_name") or config.get("experiment", {}).get("name", "mappo_run")
     logger = CoevolutionWandbLogger(
         output_dir=output_dir,
+        run_name=run_name,
         config_path=_PROJECT_ROOT / "configs" / "wandb_config.yaml",
         mode=wandb_mode,
     )

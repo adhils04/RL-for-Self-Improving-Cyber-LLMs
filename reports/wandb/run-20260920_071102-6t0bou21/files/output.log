@@ -1,0 +1,28 @@
+[*] Starting Co-evolution Training Loop...
+[!] Attacker update failed: Trying to backward through the graph a second time (or directly access saved tensors after they have already been freed). Saved intermediate values of the graph are freed when you call .backward() or autograd.grad(). Specify retain_graph=True if you need to backward through the graph a second time or if you need to access saved tensors after calling backward.
+[!] Attacker update failed: Trying to backward through the graph a second time (or directly access saved tensors after they have already been freed). Saved intermediate values of the graph are freed when you call .backward() or autograd.grad(). Specify retain_graph=True if you need to backward through the graph a second time or if you need to access saved tensors after calling backward.
+[!] Attacker update failed: Trying to backward through the graph a second time (or directly access saved tensors after they have already been freed). Saved intermediate values of the graph are freed when you call .backward() or autograd.grad(). Specify retain_graph=True if you need to backward through the graph a second time or if you need to access saved tensors after calling backward.
+[!] Attacker update failed: Expected parameter logits (Tensor of shape (2, 5)) of distribution Categorical(logits: torch.Size([2, 5])) to satisfy the constraint IndependentConstraint(Real(), 1), but found invalid values:
+tensor([[nan, nan, nan, nan, nan],
+        [nan, nan, nan, nan, nan]], grad_fn=<SubBackward0>)
+[!] Attacker update failed: Expected parameter logits (Tensor of shape (2, 5)) of distribution Categorical(logits: torch.Size([2, 5])) to satisfy the constraint IndependentConstraint(Real(), 1), but found invalid values:
+tensor([[nan, nan, nan, nan, nan],
+        [nan, nan, nan, nan, nan]], grad_fn=<SubBackward0>)
+[!] Attacker update failed: Expected parameter logits (Tensor of shape (2, 5)) of distribution Categorical(logits: torch.Size([2, 5])) to satisfy the constraint IndependentConstraint(Real(), 1), but found invalid values:
+tensor([[nan, nan, nan, nan, nan],
+        [nan, nan, nan, nan, nan]], grad_fn=<SubBackward0>)
+Traceback (most recent call last):
+  File "/kaggle/working/RL-for-Self-Improving-Cyber-LLMs/scripts/run_mappo_coevolution.py", line 294, in <module>
+    main()
+  File "/kaggle/working/RL-for-Self-Improving-Cyber-LLMs/scripts/run_mappo_coevolution.py", line 146, in main
+    decision      = attacker.get_action(state_tensor)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/kaggle/working/RL-for-Self-Improving-Cyber-LLMs/src/attacker_policy/mappo_attacker.py", line 83, in get_action
+    distribution = Categorical(logits=logits)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributions/categorical.py", line 84, in __init__
+    super().__init__(batch_shape, validate_args=validate_args)
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributions/distribution.py", line 78, in __init__
+    raise ValueError(
+ValueError: Expected parameter logits (Tensor of shape (1, 5)) of distribution Categorical(logits: torch.Size([1, 5])) to satisfy the constraint IndependentConstraint(Real(), 1), but found invalid values:
+tensor([[nan, nan, nan, nan, nan]], grad_fn=<SubBackward0>)

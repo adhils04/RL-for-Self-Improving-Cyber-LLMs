@@ -1,0 +1,74 @@
+_wandb:
+    value:
+        cli_version: 0.26.1
+        e:
+            wkvto6605oum37b2lqckv8el0upy9aus:
+                args:
+                    - --config
+                    - configs/mappo_config.yaml
+                codePath: scripts/run_mappo_coevolution.py
+                codePathLocal: scripts/run_mappo_coevolution.py
+                cpu_count: 2
+                cpu_count_logical: 4
+                cudaVersion: "13.0"
+                disk:
+                    /:
+                        total: "8656922775552"
+                        used: "7557162725376"
+                email: subhojeetchanda18@gmail.com
+                executable: /usr/bin/python3
+                git:
+                    commit: dc3a16c269cc5c7e63e54d3a95df9c06fa119337
+                    remote: https://github.com/subhojeetchanda/RL-for-Self-Improving-Cyber-LLMs.git
+                gpu: Tesla T4
+                gpu_count: 2
+                gpu_nvidia:
+                    - architecture: Turing
+                      cudaCores: 2560
+                      memoryTotal: "16106127360"
+                      name: Tesla T4
+                      uuid: GPU-ea1eea89-ac8a-cede-4bf1-a02fa94d0b37
+                    - architecture: Turing
+                      cudaCores: 2560
+                      memoryTotal: "16106127360"
+                      name: Tesla T4
+                      uuid: GPU-e7465edd-5586-c7d3-4787-f4119adface8
+                host: af575ea3a2e4
+                memory:
+                    total: "33659375616"
+                os: Linux-6.12.90+-x86_64-with-glibc2.35
+                program: /kaggle/working/RL-for-Self-Improving-Cyber-LLMs/scripts/run_mappo_coevolution.py
+                python: CPython 3.12.13
+                root: reports
+                startedAt: "2026-09-20T07:23:08.672969Z"
+                writerId: wkvto6605oum37b2lqckv8el0upy9aus
+        m: []
+        python_version: 3.12.13
+        t:
+            "1":
+                - 1
+                - 5
+                - 11
+                - 41
+                - 49
+                - 53
+                - 71
+            "2":
+                - 1
+                - 5
+                - 11
+                - 41
+                - 49
+                - 53
+                - 71
+            "3":
+                - 13
+                - 15
+                - 61
+            "4": 3.12.13
+            "5": 0.26.1
+            "6": 5.0.0
+            "8":
+                - 2
+            "12": 0.26.1
+            "13": linux-x86_64

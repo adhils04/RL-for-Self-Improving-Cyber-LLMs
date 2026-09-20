@@ -84,9 +84,6 @@ class CoevolutionWandbLogger:
         Defaults to ``"disabled"`` so unit tests never touch the network.
     """
 
-    COEVO_METRICS_FILENAME = "review2_coevolution_metrics.json"
-    ADV_TRACES_FILENAME = "review2_adversarial_traces.json"
-
     def __init__(
         self,
         output_dir: str | Path = "reports",
@@ -95,6 +92,11 @@ class CoevolutionWandbLogger:
         mode: Optional[str] = None,
     ) -> None:
         self._output_dir = Path(output_dir)
+        
+        # Use run_name for file prefixes to avoid overwriting
+        prefix = f"{run_name}_" if run_name else "review2_"
+        self.coevo_metrics_filename = f"{prefix}coevolution_metrics.json"
+        self.adv_traces_filename = f"{prefix}adversarial_traces.json"
         self._tracker = WandbTracker(
             config_path=config_path,
             run_name=run_name or f"r2_coevo_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}",
@@ -368,7 +370,7 @@ class CoevolutionWandbLogger:
             ),
         }
 
-        metrics_path = self._output_dir / self.COEVO_METRICS_FILENAME
+        metrics_path = self._output_dir / self.coevo_metrics_filename
         metrics_path.write_text(json.dumps(coevo_report, indent=2), encoding="utf-8")
         written["coevo_metrics"] = metrics_path
         logger.info("Wrote coevolution metrics to %s", metrics_path)
@@ -394,7 +396,7 @@ class CoevolutionWandbLogger:
             ),
         }
 
-        traces_path = self._output_dir / self.ADV_TRACES_FILENAME
+        traces_path = self._output_dir / self.adv_traces_filename
         traces_path.write_text(json.dumps(traces_report, indent=2), encoding="utf-8")
         written["adv_traces"] = traces_path
         logger.info("Wrote adversarial traces to %s", traces_path)
