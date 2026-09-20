@@ -22,7 +22,7 @@ class CentralizedCritic(nn.Module):
         self.model = AutoModelForSequenceClassification.from_pretrained(
             model_name_or_path,
             num_labels=1,
-            torch_dtype=torch.float16,
+            torch_dtype=torch.float32,
         ).to(self.device)
 
         # Bug fix #10: lr is now config-driven (default kept for backward compat)
