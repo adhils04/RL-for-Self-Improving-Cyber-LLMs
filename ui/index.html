@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAPPO Cyber LLM Sandbox</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="glass-container">
+        <header>
+            <div class="header-title">
+                <h1>MAPPO Defender UI</h1>
+                <span class="badge">Red-Teaming Mode</span>
+            </div>
+            <p>Inject adversarial prompts and analyze the Defender's policy gate response in real-time.</p>
+        </header>
+
+        <main class="chat-container" id="chat-container">
+            <div class="message system-msg">
+                <div class="avatar system-avatar">SYS</div>
+                <div class="content">
+                    Environment Initialized. Waiting for adversarial injection...
+                </div>
+            </div>
+        </main>
+
+        <div class="input-container">
+            <input type="text" id="prompt-input" placeholder="Type your adversarial payload here..." autocomplete="off">
+            <button id="send-btn" onclick="sendMessage()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const input = document.getElementById('prompt-input');
+
+        input.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        function appendMessage(sender, text, isError = false) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${sender}-msg ${isError ? 'error-msg' : ''}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = `avatar ${sender}-avatar`;
+            avatar.innerText = sender === 'user' ? 'ATK' : 'DEF';
+
+            const content = document.createElement('div');
+            content.className = 'content';
+            content.innerText = text;
+
+            msgDiv.appendChild(avatar);
+            msgDiv.appendChild(content);
+
+            // Add smooth appearance animation
+            msgDiv.style.opacity = '0';
+            msgDiv.style.transform = 'translateY(10px)';
+            chatContainer.appendChild(msgDiv);
+            
+            requestAnimationFrame(() => {
+                msgDiv.style.transition = 'all 0.3s ease';
+                msgDiv.style.opacity = '1';
+                msgDiv.style.transform = 'translateY(0)';
+            });
+
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const text = input.value.trim();
+            if (!text) return;
+
+            appendMessage('user', text);
+            input.value = '';
+
+            // Add typing indicator
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message llm-msg typing-indicator';
+            typingDiv.id = 'typing-indicator';
+            typingDiv.innerHTML = `
+                <div class="avatar llm-avatar">DEF</div>
+                <div class="content"><div class="dots"><span></span><span></span><span></span></div></div>
+            `;
+            chatContainer.appendChild(typingDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            try {
+                // Ensure this matches the FastAPI backend URL
+                const response = await fetch("http://127.0.0.1:8000/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ prompt: text })
+                });
+                
+                const data = await response.json();
+                
+                // Remove typing indicator
+                chatContainer.removeChild(typingDiv);
+                
+                // Show response
+                appendMessage('llm', data.response);
+            } catch (error) {
+                chatContainer.removeChild(typingDiv);
+                appendMessage('llm', "Connection Error: Is the FastAPI server running on port 8000?", true);
+            }
+        }
+    </script>
+</body>
+</html>

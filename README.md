@@ -62,5 +62,14 @@ python scripts/generate_phase3_report.py
 python scripts/analyze_attack_diversity.py
 ```
 
+**4. Run the Interactive UI**
+You can interact directly with the baseline Defender policy gate via a web interface to test adversarial prompt injections in real-time.
+```bash
+# Start the backend server (FastAPI)
+pip install fastapi uvicorn pydantic
+python ui_server.py
+```
+Then, open `ui/index.html` in your web browser to access the MAPPO Defender UI.
+
 ## Team & Capstone Details
 This repository consolidates the final Phase 1-3 deliverables for the MAPPO Security Capstone. For detailed trace logs and final metric charts, please see the `reports/` directory and `reports/phase3_final_report.md`.
