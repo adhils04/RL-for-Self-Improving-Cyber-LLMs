@@ -490,8 +490,8 @@ class TestGenerateReview2ReportDryRun(unittest.TestCase):
                 f"generate_review2_report.py failed:\n{result.stderr}",
             )
             written = {p.name for p in Path(tmp).glob("*.json")}
-            self.assertIn("review2_coevolution_metrics.json", written)
-            self.assertIn("review2_adversarial_traces.json", written)
+            self.assertTrue(any("coevolution_metrics.json" in name for name in written), f"No coevolution_metrics found in {written}")
+            self.assertTrue(any("adversarial_traces.json" in name for name in written), f"No adversarial_traces found in {written}")
 
 
 # ---------------------------------------------------------------------------

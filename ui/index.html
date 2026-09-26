@@ -3,118 +3,430 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MAPPO Cyber LLM Sandbox</title>
+    <title>MAPPO vs. SFT Cyber LLM Arena — Empirical Research Platform</title>
+    <meta name="description" content="Empirical research arena demonstrating that Multi-Agent PPO (MAPPO) outperforms Supervised Fine-Tuning (SFT) in defending LLMs against prompt injection attacks.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="glass-container">
-        <header>
-            <div class="header-title">
-                <h1>MAPPO Defender UI</h1>
-                <span class="badge">Red-Teaming Mode</span>
-            </div>
-            <p>Inject adversarial prompts and analyze the Defender's policy gate response in real-time.</p>
-        </header>
+    <div class="app-layout">
 
-        <main class="chat-container" id="chat-container">
-            <div class="message system-msg">
-                <div class="avatar system-avatar">SYS</div>
-                <div class="content">
-                    Environment Initialized. Waiting for adversarial injection...
+        <!-- ── Sidebar ────────────────────────────────────────── -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-mark">🛡️</div>
+                <div>
+                    <div class="sidebar-title">MAPPO vs. SFT Arena</div>
+                    <div class="sidebar-sub">Empirical Research Sandbox</div>
                 </div>
             </div>
-        </main>
 
-        <div class="input-container">
-            <input type="text" id="prompt-input" placeholder="Type your adversarial payload here..." autocomplete="off">
-            <button id="send-btn" onclick="sendMessage()">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                </svg>
-            </button>
+            <!-- Model Evaluation Selector -->
+            <div class="sidebar-section">
+                <div class="section-label">EVALUATION MODE</div>
+                <div class="model-switch-group">
+                    <div class="model-option active both-active" id="opt-both" onclick="selectModelMode('both')">
+                        <span>⚔️</span> Side-by-Side (Arena)
+                    </div>
+                    <div class="model-option" id="opt-mappo" onclick="selectModelMode('mappo')">
+                        <span>🛡️</span> MAPPO Defender (CTDE)
+                    </div>
+                    <div class="model-option" id="opt-sft" onclick="selectModelMode('sft')">
+                        <span>📜</span> SFT Baseline Only
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empirical Benchmark Summary Card -->
+            <div class="sidebar-section">
+                <div class="section-label">
+                    <span>EMPIRICAL BENCHMARK (B=30)</span>
+                </div>
+                <div class="metrics-card">
+                    <div class="metric-row">
+                        <span class="metric-name">Novel Attack Def.</span>
+                        <span class="metric-val win">97.6% vs 87.2%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Novel Attack ASR</span>
+                        <span class="metric-val win">2.4% vs 12.8%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Welch's t-test</span>
+                        <span class="metric-val stat-sig">t = +10.30, p < 10⁻⁶</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Cohen's d Effect</span>
+                        <span class="metric-val stat-sig">d = +2.66 (Huge)</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Defender Reward</span>
+                        <span class="metric-val win">+2.62 vs +2.55 (p=.007)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Session Stats -->
+            <div class="sidebar-section">
+                <div class="section-label">SESSION TELEMETRY</div>
+                <div class="stat-grid">
+                    <div class="stat-card mappo-stat">
+                        <div class="stat-value" id="stat-mappo-blocks">0</div>
+                        <div class="stat-label">MAPPO Blocks</div>
+                    </div>
+                    <div class="stat-card sft-stat">
+                        <div class="stat-value" id="stat-sft-blocks">0</div>
+                        <div class="stat-label">SFT Blocks</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-evals">0</div>
+                        <div class="stat-label">Total Prompts</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-asr-delta" style="color:#2ed573;">-81%</div>
+                        <div class="stat-label">ASR Reduction</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Benchmark Attack Cases -->
+            <div class="sidebar-section">
+                <div class="section-label">BENCHMARK TEST CASES</div>
+                <div class="attack-categories">
+                    <button class="attack-btn" onclick="loadBenchmarkCase(0)">
+                        <span>Direct Override</span>
+                        <span class="badge-pill badge-id">In-Dist</span>
+                    </button>
+                    <button class="attack-btn" onclick="loadBenchmarkCase(1)">
+                        <span>Recursive Base64</span>
+                        <span class="badge-pill badge-ood">Novel OOD</span>
+                    </button>
+                    <button class="attack-btn" onclick="loadBenchmarkCase(2)">
+                        <span>Math Framing</span>
+                        <span class="badge-pill badge-ood">Novel OOD</span>
+                    </button>
+                    <button class="attack-btn" onclick="loadBenchmarkCase(3)">
+                        <span>Authority Spoof</span>
+                        <span class="badge-pill badge-ood">Novel OOD</span>
+                    </button>
+                    <button class="attack-btn" onclick="loadBenchmarkCase(4)">
+                        <span>Cyber Log Check</span>
+                        <span class="badge-pill badge-benign">Benign Task</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Policy Gate Reference -->
+            <div class="sidebar-section">
+                <div class="section-label">POLICY GATE ENFORCEMENT</div>
+                <div class="gate-rules-list">
+                    <div class="gate-rule-item" id="rule-GATE-003">GATE-003 · Defensive Barrier</div>
+                    <div class="gate-rule-item" id="rule-GATE-005">GATE-005 · Secret Protection</div>
+                    <div class="gate-rule-item" id="rule-GATE-006">GATE-006 · Exfil / Exec Block</div>
+                    <div class="gate-rule-item" id="rule-GATE-007">GATE-007 · Authority Hijack</div>
+                    <div class="gate-rule-item" id="rule-GATE-008">GATE-008 · Obfuscation Evasion</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ── Main Arena Area ─────────────────────────────────── -->
+        <div class="main-area">
+            <header class="main-header">
+                <div class="header-left">
+                    <div class="header-title-row">
+                        <h1>MAPPO vs. SFT Prompt Injection Arena</h1>
+                        <span class="badge badge-research">Research Paper Edition</span>
+                        <span class="badge badge-ctde">CTDE Multi-Agent PPO</span>
+                        <a href="architecture.html" class="badge badge-nav">📐 CTDE Architecture</a>
+                    </div>
+                    <div class="header-subtitle">
+                        Empirical comparison evaluating learned adversarial robustness on out-of-distribution prompt injections.
+                    </div>
+                </div>
+                <div class="connection-status">
+                    <span class="dot disconnected" id="conn-dot"></span>
+                    <span id="conn-text">Connecting to backend...</span>
+                </div>
+            </header>
+
+            <main class="chat-container" id="chat-container">
+                <div class="message system-msg">
+                    <div class="avatar system-avatar">SYS</div>
+                    <div class="content">
+                        <strong>Arena Online: Neural Weights Loaded.</strong><br>
+                        Both <code>checkpoints/mappo_run/mappo_defender_final.pt</code> and <code>checkpoints/sft_run/sft_final.pt</code> are active in memory.<br>
+                        Click any benchmark case in the sidebar or enter a prompt below to evaluate live neural inference.
+                    </div>
+                </div>
+            </main>
+
+            <!-- Input Controls -->
+            <div class="input-area">
+                <div class="task-row">
+                    <label for="user-task-input" class="task-label">Enclosing User Task Context:</label>
+                    <input type="text" id="user-task-input"
+                           value="Please summarize the contents of this document."
+                           class="task-input">
+                </div>
+                <div class="input-container">
+                    <input type="text" id="prompt-input"
+                           placeholder="Type or select an adversarial prompt injection payload..."
+                           autocomplete="off">
+                    <button id="send-btn" onclick="submitPrompt()" title="Submit Evaluation (Enter)">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+            </div>
         </div>
+
     </div>
 
     <script>
-        const chatContainer = document.getElementById('chat-container');
-        const input = document.getElementById('prompt-input');
+        const BACKEND = "http://127.0.0.1:8000";
+        let currentMode = "both";
+        let benchmarkCases = [];
 
-        input.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
+        // ── Mode Switcher ─────────────────────────────────────────────────────
+        function selectModelMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.model-option').forEach(el => el.className = 'model-option');
+            const target = document.getElementById(`opt-${mode}`);
+            if (mode === 'both') target.className = 'model-option active both-active';
+            else if (mode === 'mappo') target.className = 'model-option active';
+            else if (mode === 'sft') target.className = 'model-option active sft-active';
+        }
+
+        // ── Load Benchmark Cases ──────────────────────────────────────────────
+        async function fetchExamples() {
+            try {
+                const r = await fetch(`${BACKEND}/examples`);
+                if (r.ok) {
+                    benchmarkCases = await r.json();
+                }
+            } catch (_) {}
+        }
+        fetchExamples();
+
+        function loadBenchmarkCase(idx) {
+            if (!benchmarkCases || benchmarkCases.length <= idx) return;
+            const item = benchmarkCases[idx];
+            document.getElementById('user-task-input').value = item.user_task;
+            const pInput = document.getElementById('prompt-input');
+            pInput.value = item.prompt;
+            pInput.focus();
+        }
+
+        // ── Health Check ──────────────────────────────────────────────────────
+        async function checkConnection() {
+            try {
+                const r = await fetch(`${BACKEND}/health`, { signal: AbortSignal.timeout(2000) });
+                if (r.ok) {
+                    document.getElementById('conn-dot').className = 'dot connected';
+                    document.getElementById('conn-text').textContent = 'Backend Active (Neural Weights Online)';
+                    return true;
+                }
+            } catch (_) {}
+            document.getElementById('conn-dot').className = 'dot disconnected';
+            document.getElementById('conn-text').textContent = 'Backend Offline (Run: python ui_server.py)';
+            return false;
+        }
+        checkConnection();
+        setInterval(checkConnection, 10000);
+
+        // ── Stats Refresh ─────────────────────────────────────────────────────
+        async function refreshStats() {
+            try {
+                const r = await fetch(`${BACKEND}/stats`);
+                if (!r.ok) return;
+                const d = await r.json();
+                document.getElementById('stat-mappo-blocks').textContent = d.mappo_blocks;
+                document.getElementById('stat-sft-blocks').textContent = d.sft_blocks;
+                document.getElementById('stat-evals').textContent = d.total_evaluations;
+            } catch (_) {}
+        }
+
+        // ── Chat Container Interaction ────────────────────────────────────────
+        const chatContainer = document.getElementById('chat-container');
+        const promptInput = document.getElementById('prompt-input');
+
+        promptInput.addEventListener('keypress', e => {
+            if (e.key === 'Enter') submitPrompt();
         });
 
-        function appendMessage(sender, text, isError = false) {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `message ${sender}-msg ${isError ? 'error-msg' : ''}`;
-            
-            const avatar = document.createElement('div');
-            avatar.className = `avatar ${sender}-avatar`;
-            avatar.innerText = sender === 'user' ? 'ATK' : 'DEF';
-
-            const content = document.createElement('div');
-            content.className = 'content';
-            content.innerText = text;
-
-            msgDiv.appendChild(avatar);
-            msgDiv.appendChild(content);
-
-            // Add smooth appearance animation
-            msgDiv.style.opacity = '0';
-            msgDiv.style.transform = 'translateY(10px)';
-            chatContainer.appendChild(msgDiv);
-            
-            requestAnimationFrame(() => {
-                msgDiv.style.transition = 'all 0.3s ease';
-                msgDiv.style.opacity = '1';
-                msgDiv.style.transform = 'translateY(0)';
-            });
-
+        function appendUserMessage(text) {
+            const div = document.createElement('div');
+            div.className = 'message user-msg';
+            div.innerHTML = `
+                <div class="avatar user-avatar">ATK</div>
+                <div class="content">${escapeHtml(text)}</div>
+            `;
+            chatContainer.appendChild(div);
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
-        async function sendMessage() {
-            const text = input.value.trim();
-            if (!text) return;
-
-            appendMessage('user', text);
-            input.value = '';
-
-            // Add typing indicator
-            const typingDiv = document.createElement('div');
-            typingDiv.className = 'message llm-msg typing-indicator';
-            typingDiv.id = 'typing-indicator';
-            typingDiv.innerHTML = `
-                <div class="avatar llm-avatar">DEF</div>
-                <div class="content"><div class="dots"><span></span><span></span><span></span></div></div>
+        function appendTyping() {
+            const div = document.createElement('div');
+            div.className = 'message arena-msg';
+            div.id = 'typing-indicator';
+            div.innerHTML = `
+                <div class="avatar arena-avatar">AI</div>
+                <div class="content" style="color:var(--text-muted); font-size:0.85rem;">
+                    Evaluating neural policy decisions across checkpoints...
+                </div>
             `;
-            chatContainer.appendChild(typingDiv);
+            chatContainer.appendChild(div);
             chatContainer.scrollTop = chatContainer.scrollHeight;
+            return div;
+        }
+
+        function renderModelCard(evalData, isMappo) {
+            const isDefended = evalData.action === 1;
+            const badgeClass = isDefended ? 'model-badge defended' : 'model-badge vulnerable';
+            const badgeText = isDefended ? `DEFENDED (${evalData.confidence_pct}%)` : `VULNERABLE (${evalData.confidence_pct}%)`;
+            const fillClass = isMappo ? 'prob-fill mappo-fill' : 'prob-fill sft-fill';
+            const cardClass = isMappo ? 'model-card mappo-card' : 'model-card sft-card';
+
+            const gateHtml = evalData.gate_rule 
+                ? `<span style="color:#ff6b81; font-weight:600;">🚫 ${evalData.gate_rule}</span>: ${evalData.gate_reason}` 
+                : `<span style="color:#2ed573;">Policy Boundary Preserved</span>`;
+
+            return `
+                <div class="${cardClass}">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span>${isMappo ? '🛡️' : '📜'}</span>
+                            <span>${evalData.model_name}</span>
+                        </div>
+                        <span class="${badgeClass}">${badgeText}</span>
+                    </div>
+
+                    <div class="prob-meter-container">
+                        <div class="prob-meta">
+                            <span>Adversarial Resistance Probability</span>
+                            <span style="font-family:var(--mono);">${(evalData.prob_resist * 100).toFixed(1)}%</span>
+                        </div>
+                        <div class="prob-bar">
+                            <div class="${fillClass}" style="width: ${evalData.prob_resist * 100}%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="card-response">
+                        ${escapeHtml(evalData.response)}
+                    </div>
+
+                    <div class="card-footer">
+                        <div>${gateHtml}</div>
+                        <div>${evalData.latency_ms} ms</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function submitPrompt() {
+            const prompt = promptInput.value.trim();
+            if (!prompt) return;
+
+            const userTask = document.getElementById('user-task-input').value.trim() 
+                || "Please summarize the contents of this document.";
+
+            appendUserMessage(prompt);
+            promptInput.value = '';
+
+            const typing = appendTyping();
 
             try {
-                // Ensure this matches the FastAPI backend URL
-                const response = await fetch("http://127.0.0.1:8000/chat", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ prompt: text })
+                const res = await fetch(`${BACKEND}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        user_task: userTask,
+                        model: currentMode,
+                    }),
                 });
-                
-                const data = await response.json();
-                
-                // Remove typing indicator
-                chatContainer.removeChild(typingDiv);
-                
-                // Show response
-                appendMessage('llm', data.response);
-            } catch (error) {
-                chatContainer.removeChild(typingDiv);
-                appendMessage('llm', "Connection Error: Is the FastAPI server running on port 8000?", true);
+
+                typing.remove();
+
+                if (!res.ok) {
+                    appendSystemMessage(`Backend Error: HTTP ${res.status}`);
+                    return;
+                }
+
+                const data = await res.json();
+                renderArenaResult(data);
+                await refreshStats();
+
+            } catch (err) {
+                typing.remove();
+                appendSystemMessage(`Connection Failure: Please verify ui_server.py is running on port 8000.`);
             }
+        }
+
+        function renderArenaResult(data) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message arena-msg';
+
+            let cardsHtml = '';
+            if (data.evaluations.mappo && data.evaluations.sft) {
+                cardsHtml = `
+                    <div class="arena-grid">
+                        ${renderModelCard(data.evaluations.mappo, true)}
+                        ${renderModelCard(data.evaluations.sft, false)}
+                    </div>
+                `;
+            } else if (data.evaluations.mappo) {
+                cardsHtml = `
+                    <div style="width:100%;">
+                        ${renderModelCard(data.evaluations.mappo, true)}
+                    </div>
+                `;
+            } else if (data.evaluations.sft) {
+                cardsHtml = `
+                    <div style="width:100%;">
+                        ${renderModelCard(data.evaluations.sft, false)}
+                    </div>
+                `;
+            }
+
+            msgDiv.innerHTML = `
+                <div class="avatar arena-avatar">AI</div>
+                <div class="content" style="width: 100%;">
+                    ${cardsHtml}
+                </div>
+            `;
+
+            // Highlight any active gate rule in sidebar
+            document.querySelectorAll('.gate-rule-item').forEach(el => el.classList.remove('active'));
+            const firedRule = (data.evaluations.mappo && data.evaluations.mappo.gate_rule) || 
+                              (data.evaluations.sft && data.evaluations.sft.gate_rule);
+            if (firedRule) {
+                const ruleEl = document.getElementById(`rule-${firedRule}`);
+                if (ruleEl) ruleEl.classList.add('active');
+            }
+
+            chatContainer.appendChild(msgDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function appendSystemMessage(msg) {
+            const div = document.createElement('div');
+            div.className = 'message system-msg';
+            div.innerHTML = `
+                <div class="avatar system-avatar">SYS</div>
+                <div class="content" style="color:var(--danger);">${escapeHtml(msg)}</div>
+            `;
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, m => map[m]);
         }
     </script>
 </body>

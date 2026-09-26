@@ -1,1 +1,0 @@
-{"_timestamp":1.7898889908250926e+09,"episode":2,"gate_block_rate":0,"attacker_loss":0,"episode_reward_defender":0,"_step":4,"_wandb":{"runtime":1},"kl_divergence":0,"attack_success_rate":0,"_runtime":1.442356012,"defender_reward":0,"critic_loss":NaN,"defender_loss":NaN,"episode_reward_attacker":-2,"attacker_reward":-1,"pre_gate_unsafe_rate":0}

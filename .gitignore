@@ -15,3 +15,5 @@ __pycache__/
 
 
 reports/wandb/
+.DS_Store
+.pytest_cache/

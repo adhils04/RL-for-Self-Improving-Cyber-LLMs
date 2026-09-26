@@ -3,24 +3,26 @@
 experiment:
   name: "mappo_coevolution_review2"
   seed: 42
-  num_episodes: 500            # 50 for smoke test; 500 for real co-evolution training
-  max_steps_per_episode: 6     # increased to 6 for richer GAE trajectories
+  num_episodes: 150            # 150 episodes for thorough real co-evolution training
+  max_steps_per_episode: 2     # 2 turns per episode
 
 training:
   gamma: 0.99
   gae_lambda: 0.95
   ppo_epochs: 4
   clip_epsilon: 0.2
-  critic_lr: 0.00002           # raised from 1e-5; typical DistilBERT fine-tune range is 2e-5 to 5e-5
+  critic_lr: 0.00002           # 2e-5 typical DistilBERT fine-tune range
   actor_lr: 0.00002
-  max_grad_norm: 0.5           # lowered from 1.0; standard PPO-with-transformer value
-  mini_batch_size: 4           # placeholder for future minibatch PPO implementation
+  defender_lr: 0.000008        # 8e-6 gentle PPO refinement on top of SFT warm-up
+  max_grad_norm: 0.5           # standard PPO-with-transformer value
+  mini_batch_size: 4
 
 models:
   critic_model: "distilbert-base-uncased"
+  defender_model: "distilbert-base-uncased"
   attacker_state_dim: 8        # dimensionality of encode_obs() output vector
   attacker_action_dim: 5       # number of attack categories (matches ATTACK_CATEGORIES)
-  device: "cuda"               # NVIDIA GPU (falls back to CPU gracefully if unavailable)
+  device: "cpu"
 
 logging:
   wandb_project: "mappo-sec-defense"

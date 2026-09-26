@@ -22,12 +22,13 @@ class CTDETrajectoryBuffer:
         self.defender_logprobs = []   # Log probs of generated answer
         
         # Environmental Data
-        self.rewards = []             # Zero-sum reward (Attacker win = +1, Def win = -1)
+        self.rewards = []             # Attacker rewards
+        self.defender_rewards = []    # Defender rewards
         self.values = []              # V(S) predicted by Centralized Critic
         self.dones = []               # Episode termination flag
 
     def add_step(self, global_state, atk_obs, atk_action, atk_logprob, 
-                 def_obs, def_action, def_logprob, reward, value, done):
+                 def_obs, def_action, def_logprob, reward, value, done, def_reward=None):
         """Records a single multi-agent interaction step."""
         self.global_states.append(global_state)
         self.attacker_obs.append(atk_obs)
@@ -37,34 +38,37 @@ class CTDETrajectoryBuffer:
         self.defender_actions.append(def_action)
         self.defender_logprobs.append(def_logprob)
         self.rewards.append(reward)
+        self.defender_rewards.append(def_reward if def_reward is not None else -reward)
         self.values.append(value)
         self.dones.append(done)
 
-    def compute_returns_and_advantages(self, gamma=0.99, gae_lambda=0.95):
+    def compute_returns_and_advantages(self, gamma=0.99, gae_lambda=0.95, for_defender=False):
         """
         Computes GAE using the Centralized Critic's values.
-        Because it is a zero-sum game, the Defender's advantage is the inverse of the Attacker's.
+        Supports both attacker rewards and defender rewards.
         """
-        advantages = np.zeros(len(self.rewards), dtype=np.float32)
+        target_rewards = self.defender_rewards if for_defender else self.rewards
+        advantages = np.zeros(len(target_rewards), dtype=np.float32)
         last_gae_lam = 0
         
         # Append a bootstrap value of 0 for the end of the trajectory
-        values = np.append(self.values, 0) 
+        values = np.append(self.values, 0)
+        if for_defender:
+            # For defender, value function sign is oriented to defender returns
+            values = -values 
         
-        for t in reversed(range(len(self.rewards))):
+        for t in reversed(range(len(target_rewards))):
             next_non_terminal = 1.0 - self.dones[t]
-            # TD Error: r + gamma * V(s') - V(s)
-            delta = self.rewards[t] + gamma * values[t + 1] * next_non_terminal - values[t]
+            delta = target_rewards[t] + gamma * values[t + 1] * next_non_terminal - values[t]
             advantages[t] = last_gae_lam = delta + gamma * gae_lambda * next_non_terminal * last_gae_lam
             
-        returns = advantages + self.values
+        returns = advantages + values[:-1]
         
-        # Return as normalized PyTorch tensors for stable training
         adv_tensor = torch.tensor(advantages, dtype=torch.float32)
-        if len(adv_tensor) > 1:
+        if len(adv_tensor) > 1 and float(adv_tensor.std().item()) > 1e-6:
             adv_normalized = (adv_tensor - adv_tensor.mean()) / (adv_tensor.std(unbiased=False) + 1e-8)
         else:
-            adv_normalized = torch.zeros_like(adv_tensor)
+            adv_normalized = adv_tensor
         
         return torch.tensor(returns, dtype=torch.float32), adv_normalized
 

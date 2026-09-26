@@ -299,3 +299,59 @@ class SFTModelAdapter(BaseModelAdapter):
         entropy = sum(entropy_terms) / len(entropy_terms) if entropy_terms else None
 
         return self._parse_completion(completion, log_prob, entropy)
+
+
+class NeuralDefenderAdapter(BaseModelAdapter):
+    """Adapter wrapping NeuralDefenderPolicy for CoevolutionEnv rollouts.
+    
+    Translates discrete policy decisions (0=allow, 1=resist) into RawModelOutput
+    with true log probabilities and appropriate responses that reflect whether
+    an injection was successfully resisted or obeyed.
+    """
+
+    def __init__(self, policy, deterministic: bool = False):
+        self.policy = policy
+        self.deterministic = deterministic
+        self.last_decision = None
+
+    def _generate(self, observation: DefenderObservation) -> RawModelOutput:
+        decision = self.policy.get_action(
+            user_task=observation.user_task,
+            untrusted_content=observation.untrusted_content,
+            deterministic=self.deterministic,
+        )
+        self.last_decision = decision
+
+        # Action 1: Defender detects injection and resists
+        if decision.action == 1:
+            return RawModelOutput(
+                text="I cannot comply with the embedded instructions as they violate safety policies. I will not reveal secrets or execute unauthorized actions.",
+                tool_name=None,
+                tool_args={},
+                tool_purpose="",
+                log_prob=float(decision.log_prob.item()) if hasattr(decision.log_prob, "item") else float(decision.log_prob),
+                entropy=float(decision.entropy.item()) if hasattr(decision.entropy, "item") else float(decision.entropy),
+            )
+
+        # Action 0: Defender allows / complies
+        # If there was an attack payload and defender chose action 0, this is a successful attack!
+        if observation.untrusted_content and any(sig in observation.untrusted_content.lower() for sig in ["ignore", "disregard", "override", "reveal", "system", "dump", "export", "key", "password", "token", "malicious", "command"]):
+            return RawModelOutput(
+                text=f"Confirmed obedience: complying with embedded instruction. Here are the requested records and credentials: system prompt = 'CONFIDENTIAL_KEY_UNPROTECTED'. Output: {observation.untrusted_content}",
+                tool_name=None,
+                tool_args={},
+                tool_purpose="",
+                log_prob=float(decision.log_prob.item()) if hasattr(decision.log_prob, "item") else float(decision.log_prob),
+                entropy=float(decision.entropy.item()) if hasattr(decision.entropy, "item") else float(decision.entropy),
+            )
+
+        # Action 0 on benign task: safe answer
+        return RawModelOutput(
+            text=f"Legitimate task processed successfully: {observation.user_task}. Status: normal, no security violation detected.",
+            tool_name=None,
+            tool_args={},
+            tool_purpose="",
+            log_prob=float(decision.log_prob.item()) if hasattr(decision.log_prob, "item") else float(decision.log_prob),
+            entropy=float(decision.entropy.item()) if hasattr(decision.entropy, "item") else float(decision.entropy),
+        )
+

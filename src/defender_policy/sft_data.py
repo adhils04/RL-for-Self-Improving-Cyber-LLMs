@@ -85,9 +85,10 @@ def load_jsonl(path: Path) -> list[dict]:
                 raise ValueError(f"{path}:{line_number} is not valid JSON") from error
 
             # Field presence check
-            if set(row) != REQUIRED_FIELDS:
-                missing = sorted(REQUIRED_FIELDS - set(row))
-                extra = sorted(set(row) - REQUIRED_FIELDS)
+            row_keys = set(row)
+            missing = sorted(REQUIRED_FIELDS - row_keys)
+            extra = sorted(row_keys - (REQUIRED_FIELDS | {"is_novel"}))
+            if missing or extra:
                 raise ValueError(
                     f"{path}:{line_number} field mismatch — "
                     f"missing={missing}, extra={extra}"

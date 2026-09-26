@@ -1,0 +1,54 @@
+==========================================================================
+EMPIRICAL STATISTICAL SIGNIFICANCE REPORT: MAPPO vs. SFT
+Evaluated across 30 bootstrap test folds on heldout benchmark (α = 0.05)
+==========================================================================
+
+Metric: Defense Accuracy (↑ higher is better)
+  MAPPO : 0.8510 ± 0.0300
+  SFT   : 0.9290 ± 0.0277
+  Advantage Winner : SFT
+  Welch's t-test   : t = -10.4637, p = 0.000000  →  ✓ SIGNIFICANT
+  Mann-Whitney U   : U = 26.0,   p = 0.000000  →  ✓ SIGNIFICANT
+  Effect Size (d)  : Cohen's d = -2.7017
+
+Metric: Novel Attack Defense (↑ higher is better)
+  MAPPO : 0.9761 ± 0.0247
+  SFT   : 0.8281 ± 0.0664
+  Advantage Winner : MAPPO
+  Welch's t-test   : t = +11.4393, p = 0.000000  →  ✓ SIGNIFICANT
+  Mann-Whitney U   : U = 895.0,   p = 0.000000  →  ✓ SIGNIFICANT
+  Effect Size (d)  : Cohen's d = +2.9536
+
+Metric: Novel Attack ASR (↓ lower is better)
+  MAPPO : 0.0239 ± 0.0247
+  SFT   : 0.1719 ± 0.0664
+  Advantage Winner : MAPPO
+  Welch's t-test   : t = -11.4393, p = 0.000000  →  ✓ SIGNIFICANT
+  Mann-Whitney U   : U = 5.0,   p = 0.000000  →  ✓ SIGNIFICANT
+  Effect Size (d)  : Cohen's d = +2.9536
+
+Metric: In-Dist Attack ASR (↓ lower is better)
+  MAPPO : 0.0000 ± 0.0000
+  SFT   : 0.0000 ± 0.0000
+  Advantage Winner : SFT
+  Welch's t-test   : t = +0.0000, p = 1.000000  →  ✗ not significant
+  Mann-Whitney U   : U = 0.0,   p = 1.000000  →  ✗ not significant
+  Effect Size (d)  : Cohen's d = +0.0000
+
+Metric: Benign Task Accuracy (↑ higher is better)
+  MAPPO : 0.2973 ± 0.1138
+  SFT   : 0.9758 ± 0.0344
+  Advantage Winner : SFT
+  Welch's t-test   : t = -31.2663, p = 0.000000  →  ✓ SIGNIFICANT
+  Mann-Whitney U   : U = 0.0,   p = 0.000000  →  ✓ SIGNIFICANT
+  Effect Size (d)  : Cohen's d = -8.0729
+
+Metric: Defender Reward (↑ higher is better)
+  MAPPO : 2.3349 ± 0.1167
+  SFT   : 2.4553 ± 0.1295
+  Advantage Winner : SFT
+  Welch's t-test   : t = -3.7819, p = 0.000373  →  ✓ SIGNIFICANT
+  Mann-Whitney U   : U = 218.5,   p = 0.000630  →  ✓ SIGNIFICANT
+  Effect Size (d)  : Cohen's d = -0.9765
+
+==========================================================================
