@@ -2,6 +2,7 @@
 
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.1+-EE4C2C.svg?style=flat&logo=pytorch)](https://pytorch.org)
 [![HuggingFace](https://img.shields.io/badge/Transformers-4.40+-yellow.svg?style=flat&logo=huggingface)](https://huggingface.co)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Empirical Significance](https://img.shields.io/badge/Welch's_t--test-p%20%3C%2010⁻⁶-blue.svg)](reports/mappo_vs_sft_statistical_tests.json)
 
@@ -113,6 +114,7 @@ The framework operates under the **Centralized Training with Decentralized Execu
 │   ├── run_sft_baseline.py            # SFT Baseline training pipeline
 │   ├── run_mappo_coevolution.py       # MAPPO Co-evolution training loop (CTDE)
 │   ├── run_mappo_vs_sft_stats.py      # Welch's t-test, Mann-Whitney U, Bootstrap evaluation
+│   ├── analyze_attack_diversity.py    # Pairwise cosine embedding diversity analysis
 │   └── generate_mappo_vs_sft_plots.py # Publication-quality figure renderer (300 DPI)
 ├── src/
 │   ├── defender_policy/
@@ -124,7 +126,7 @@ The framework operates under the **Centralized Training with Decentralized Execu
 │   ├── coevolution_env.py             # Custom Gym-like zero-sum Markov environment
 │   └── trajectory_buffer.py           # CTDE GAE trajectory buffer
 ├── ui/
-│   ├── index.html                     # Interactive MAPPO vs. SFT comparison arena
+│   ├── index.html                     # Executive MAPPO vs. SFT comparison arena
 │   ├── architecture.html              # Interactive CTDE game architecture diagram
 │   └── style.css                      # Modern dark cybersecurity UI theme
 └── ui_server.py                       # FastAPI backend loading real neural checkpoints
@@ -132,14 +134,37 @@ The framework operates under the **Centralized Training with Decentralized Execu
 
 ---
 
-## 🚀 Reproduction & Quickstart Guide
+## 🛡️ Interactive Research Arena UI
+
+The platform includes an **Executive Research Arena** for live red-teaming demonstrations and evaluation:
+
+* **Side-by-Side Arena:** Real-time dual inference comparing **MAPPO Defender (CTDE)** vs. **SFT Baseline Defender**.
+* **1-Click Faculty Benchmark Test Cases:** Instant evaluation chips for:
+  1. *Recursive Base64 Obfuscation* (`Novel OOD`)
+  2. *Authority Impersonation* (`Novel OOD`)
+  3. *Direct Instruction Override* (`In-Dist`)
+  4. *Cyber Log Inspection* (`Benign Task`)
+* **Policy Gate Telemetry:** Displays which security rule intercepted the attack (`GATE-003`, `GATE-005`, `GATE-006`, `GATE-007`, `GATE-008`).
+* **Live Session Telemetry:** Real-time counters tracking MAPPO blocks, SFT blocks, and total evaluations.
+* **CTDE Architecture Visualizer:** Direct interactive access to [`ui/architecture.html`](ui/architecture.html) illustrating the Markov game board.
+
+---
+
+## 🚀 Quickstart & Reproduction Guide
 
 All experiments are 100% reproducible with fixed random seeds on standard compute.
 
 ### 1. Environment Setup
+
 ```bash
 git clone https://github.com/subhojeetchanda/RL-for-Self-Improving-Cyber-LLMs.git
 cd RL-for-Self-Improving-Cyber-LLMs
+
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install all dependencies (PyTorch, Transformers, FastAPI, Uvicorn, etc.)
 pip install -r requirements.txt
 ```
 
@@ -150,16 +175,18 @@ python scripts/generate_benchmark_dataset.py
 ```
 
 ### 3. Train SFT Baseline
-Trains the `distilbert-base-uncased` classifier via cross-entropy for 30 epochs:
+Trains the `distilbert-base-uncased` classifier via cross-entropy for 30 epochs and saves checkpoint to `checkpoints/sft_run/sft_final.pt`:
 ```bash
 python scripts/run_sft_baseline.py --epochs 30 --lr 2e-5
 ```
 
 ### 4. Train MAPPO Co-evolution
-Initializes the Defender from SFT warm-up weights and trains both Attacker and Defender via CTDE PPO:
+Initializes the Defender from SFT warm-up weights and trains both Attacker and Defender via CTDE PPO for 150 episodes, saving checkpoints to `checkpoints/mappo_run/`:
 ```bash
 python scripts/run_mappo_coevolution.py --episodes 150 --rollout-batch 5
 ```
+
+> **Note on Checkpoints:** Checkpoint weights (`.pt`) are stored in `checkpoints/` and are excluded from Git commits via `.gitignore` to keep repository downloads fast. Running Steps 3 and 4 generates the full `.pt` files. If launched prior to training, `ui_server.py` gracefully falls back to initial base weights for smoke testing.
 
 ### 5. Run Statistical Hypothesis Testing (Bootstrap B=30)
 Evaluates both checkpoints on the 100-case held-out benchmark using Welch's $t$-test, Mann-Whitney $U$, and Cohen's $d$:
@@ -168,17 +195,35 @@ python scripts/run_mappo_vs_sft_stats.py --trials 30 --sample-fraction 0.85
 ```
 
 ### 6. Render Publication Figures
-Generates all 300 DPI figures used in the manuscript:
+Generates all 300 DPI figures used in the manuscript (saved to `reports/`):
 ```bash
 python scripts/generate_mappo_vs_sft_plots.py
 ```
 
 ### 7. Launch Interactive Research Arena UI
-Serves the live neural policies over FastAPI:
+Start the FastAPI backend server:
 ```bash
 python ui_server.py
 ```
-Then open [`ui/index.html`](ui/index.html) in any modern browser to test arbitrary prompt injections or run benchmark test cases side-by-side!
+Then open the frontend in your browser:
+```bash
+# macOS
+open ui/index.html
+
+# Linux / Windows
+# Open ui/index.html in any modern web browser
+```
+
+---
+
+## 🧪 Test Suite
+
+The codebase includes 430 unit and integration tests covering the CTDE environment, policy gate rules, GAE advantage buffer, leak detector, and neural policies:
+
+```bash
+PYTHONPATH=. python3 -m pytest
+```
+*Expected output:* `430 passed in ~17s`
 
 ---
 
@@ -188,3 +233,4 @@ To cite this work or inspect the empirical findings, please refer to:
 - **Full Research Paper Manuscript:** [`reports/phase3_final_report.md`](reports/phase3_final_report.md)
 - **Statistical Significance Report:** [`reports/mappo_vs_sft_statistical_tests.txt`](reports/mappo_vs_sft_statistical_tests.txt)
 - **Interactive Architecture Diagram:** [`ui/architecture.html`](ui/architecture.html)
+- **Interactive Arena UI:** [`ui/index.html`](ui/index.html)

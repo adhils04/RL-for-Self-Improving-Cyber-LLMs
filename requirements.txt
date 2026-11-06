@@ -6,3 +6,5 @@ trl>=0.11.0
 bitsandbytes>=0.44.0
 datasets
 wandb
+fastapi>=0.110.0
+uvicorn>=0.28.0
