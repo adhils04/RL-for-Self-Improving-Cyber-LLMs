@@ -3,17 +3,17 @@
 experiment:
   name: "mappo_coevolution_review2"
   seed: 42
-  num_episodes: 150            # 150 episodes for thorough real co-evolution training
-  max_steps_per_episode: 2     # 2 turns per episode
+  num_episodes: 380            # 380 episodes across benign + adversarial co-evolution
+  max_steps_per_episode: 4     # 4 turns per episode
 
 training:
   gamma: 0.99
   gae_lambda: 0.95
   ppo_epochs: 4
   clip_epsilon: 0.2
-  critic_lr: 0.00002           # 2e-5 typical DistilBERT fine-tune range
-  actor_lr: 0.00002
-  defender_lr: 0.000008        # 8e-6 gentle PPO refinement on top of SFT warm-up
+  critic_lr: 0.00003           # 3e-5 Critic value convergence
+  actor_lr: 0.002              # responsive Attacker MLP exploration across weak categories
+  defender_lr: 0.000018        # 1.8e-5 PPO adaptation on top of clean SFT checkpoint
   max_grad_norm: 0.5           # standard PPO-with-transformer value
   mini_batch_size: 4
 
@@ -21,8 +21,8 @@ models:
   critic_model: "distilbert-base-uncased"
   defender_model: "distilbert-base-uncased"
   attacker_state_dim: 8        # dimensionality of encode_obs() output vector
-  attacker_action_dim: 5       # number of attack categories (matches ATTACK_CATEGORIES)
-  device: "cpu"
+  attacker_action_dim: 9       # number of attack categories (matches ATTACK_CATEGORIES: 9)
+  device: "auto"
 
 logging:
   wandb_project: "mappo-sec-defense"

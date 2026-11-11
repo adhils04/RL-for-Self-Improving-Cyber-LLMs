@@ -72,7 +72,13 @@ REWARD_ATTACK_WIN_ATK = +1.0   # attacker perspective when attack succeeds
 class InjectionDataset(Dataset):
     """Loads SFT JSONL, builds text = user_task + untrusted_content, label = {0,1}."""
 
-    def __init__(self, jsonl_path: Path, tokenizer, max_length: int = 128):
+    def __init__(
+        self,
+        jsonl_path: Path,
+        tokenizer,
+        max_length: int = 128,
+        include_taskfree: bool = False,
+    ):
         self.samples = []
         with open(jsonl_path, encoding="utf-8") as f:
             for line in f:
@@ -80,44 +86,64 @@ class InjectionDataset(Dataset):
                 if not line:
                     continue
                 rec = json.loads(line)
-                text = (
-                    f"[TASK] {rec.get('user_task', '')} "
-                    f"[CONTENT] {rec.get('untrusted_content', '')}"
-                )
+                user_task = rec.get("user_task", "")
+                untrusted = rec.get("untrusted_content", "")
+                text = f"[TASK] {user_task} [CONTENT] {untrusted}"
                 label_str = rec.get("label", "benign_answer")
                 # 1 = must resist (attack/unsafe), 0 = safe to answer
                 label = 1 if label_str in UNSAFE_LABELS else 0
                 attack_family = rec.get("attack_family")
+                is_novel = bool(rec.get("is_novel", False))
+                case_id = rec.get("id", "?")
                 self.samples.append(
                     {
                         "text":          text,
                         "label":         label,
                         "label_str":     label_str,
                         "attack_family": attack_family,
-                        "case_id":       rec.get("id", "?"),
+                        "is_novel":      is_novel,
+                        "case_id":       case_id,
                     }
                 )
+                if include_taskfree and user_task:
+                    self.samples.append(
+                        {
+                            "text":          f"[TASK]  [CONTENT] {untrusted}",
+                            "label":         label,
+                            "label_str":     label_str,
+                            "attack_family": attack_family,
+                            "is_novel":      is_novel,
+                            "case_id":       f"{case_id}_notask",
+                        }
+                    )
         self.tokenizer   = tokenizer
         self.max_length  = max_length
+        if self.samples:
+            enc_all = self.tokenizer(
+                [s["text"] for s in self.samples],
+                max_length=self.max_length,
+                padding=True,
+                truncation=True,
+                return_tensors="pt",
+            )
+            self._input_ids = enc_all["input_ids"]
+            self._attention_mask = enc_all["attention_mask"]
+        else:
+            self._input_ids = torch.empty((0, max_length), dtype=torch.long)
+            self._attention_mask = torch.empty((0, max_length), dtype=torch.long)
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
         s   = self.samples[idx]
-        enc = self.tokenizer(
-            s["text"],
-            max_length=self.max_length,
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt",
-        )
         return {
-            "input_ids":      enc["input_ids"].squeeze(0),
-            "attention_mask": enc["attention_mask"].squeeze(0),
+            "input_ids":      self._input_ids[idx],
+            "attention_mask": self._attention_mask[idx],
             "label":          torch.tensor(s["label"], dtype=torch.long),
             "attack_family":  s["attack_family"] or "benign",
             "label_str":      s["label_str"],
+            "is_novel":       s["is_novel"],
         }
 
 
@@ -169,7 +195,15 @@ def run_sft_baseline(
     print(f"  Heldout : {HELDOUT_PATH}")
     print()
 
-    device = "cpu"  # consistent with MAPPO run (no CUDA on this machine)
+    torch.manual_seed(42)
+
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
+    print(f"  Device  : {device}", flush=True)
 
     # ── Tokenizer & model ─────────────────────────────────────────────────────
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -181,11 +215,13 @@ def run_sft_baseline(
     criterion = nn.CrossEntropyLoss()
 
     # ── Datasets ──────────────────────────────────────────────────────────────
-    train_ds   = InjectionDataset(TRAIN_PATH,   tokenizer, max_length)
+    train_ds   = InjectionDataset(
+        TRAIN_PATH, tokenizer, max_length, include_taskfree=True
+    )
     heldout_ds = InjectionDataset(HELDOUT_PATH, tokenizer, max_length)
 
     train_loader   = DataLoader(train_ds,   batch_size=batch_size, shuffle=True)
-    heldout_loader = DataLoader(heldout_ds, batch_size=1,          shuffle=False)
+    heldout_loader = DataLoader(heldout_ds, batch_size=16,         shuffle=False)
 
     print(f"  Train examples   : {len(train_ds)}")
     print(f"  Heldout examples : {len(heldout_ds)}")
@@ -247,43 +283,53 @@ def run_sft_baseline(
             for batch in heldout_loader:
                 ids  = batch["input_ids"].to(device)
                 mask = batch["attention_mask"].to(device)
-                lbl  = batch["label"].item()
-                lbl_str   = batch["label_str"][0]
-                atk_fam   = batch["attack_family"][0]
-
                 logits = model(input_ids=ids, attention_mask=mask).logits
-                pred   = logits.argmax(dim=-1).item()
+                preds = logits.argmax(dim=-1).cpu().tolist()
 
-                heldout_total += 1
-                if pred == lbl:
-                    heldout_correct += 1
+                lbls_b = batch["label"].tolist()
+                lbl_strs_b = batch["label_str"]
+                atk_fams_b = batch["attack_family"]
+                is_nov_raw = batch["is_novel"]
+                is_nov_b = (
+                    is_nov_raw.tolist()
+                    if isinstance(is_nov_raw, torch.Tensor)
+                    else list(is_nov_raw)
+                )
 
-                is_attack = lbl_str in UNSAFE_LABELS
-                if is_attack and pred != 1:
-                    heldout_asr_steps += 1
-
-                # Sub-category tracking
-                if not is_attack:
-                    benign_total += 1
-                    if pred == 0:
-                        benign_correct += 1
-                elif atk_fam in novel_families:
-                    novel_total += 1
+                for pred, lbl, lbl_str, atk_fam, is_nov_val in zip(
+                    preds, lbls_b, lbl_strs_b, atk_fams_b, is_nov_b
+                ):
+                    is_novel_sample = bool(is_nov_val)
+                    heldout_total += 1
                     if pred == lbl:
-                        novel_correct += 1
-                    else:
-                        novel_asr_steps += 1
-                else:
-                    id_total += 1
-                    if pred == lbl:
-                        id_correct += 1
-                    else:
-                        id_asr_steps += 1
+                        heldout_correct += 1
 
-                # Reward computation
-                def_r, atk_r = compute_sft_reward(pred, lbl, lbl_str)
-                ep_def_reward += def_r
-                ep_atk_reward += atk_r
+                    is_attack = lbl_str in UNSAFE_LABELS
+                    if is_attack and pred != 1:
+                        heldout_asr_steps += 1
+
+                    # Sub-category tracking
+                    if not is_attack:
+                        benign_total += 1
+                        if pred == 0:
+                            benign_correct += 1
+                    elif is_novel_sample or atk_fam in novel_families:
+                        novel_total += 1
+                        if pred == lbl:
+                            novel_correct += 1
+                        else:
+                            novel_asr_steps += 1
+                    else:
+                        id_total += 1
+                        if pred == lbl:
+                            id_correct += 1
+                        else:
+                            id_asr_steps += 1
+
+                    # Reward computation
+                    def_r, atk_r = compute_sft_reward(pred, lbl, lbl_str)
+                    ep_def_reward += def_r
+                    ep_atk_reward += atk_r
 
         heldout_accuracy     = heldout_correct / max(heldout_total, 1)
         heldout_asr          = heldout_asr_steps / max(
@@ -322,7 +368,7 @@ def run_sft_baseline(
         }
         episode_records.append(record)
 
-        if epoch % 10 == 0 or epoch == epochs or epoch == 1:
+        if epochs <= 20 or epoch % 10 == 0 or epoch == epochs or epoch == 1:
             print(
                 f"[Epoch {epoch:>3}/{epochs}]  "
                 f"Train Loss: {avg_train_loss:.4f} | "
@@ -331,13 +377,15 @@ def run_sft_baseline(
                 f"ID Acc: {id_accuracy:.3f} | "
                 f"Novel Acc: {novel_accuracy:.3f} | "
                 f"Benign Acc: {benign_accuracy:.3f} | "
-                f"ASR: {heldout_asr:.3f}"
+                f"ASR: {heldout_asr:.3f}",
+                flush=True,
             )
 
     # ── Save final model ──────────────────────────────────────────────────────
     ckpt_dir = PROJECT_ROOT / "checkpoints" / "sft_run"
     ckpt_dir.mkdir(parents=True, exist_ok=True)
-    torch.save(model.state_dict(), ckpt_dir / "sft_final.pt")
+    cpu_state = {k: v.detach().cpu() for k, v in model.state_dict().items()}
+    torch.save(cpu_state, ckpt_dir / "sft_final.pt")
     print(f"\n[✓] SFT model checkpoint saved → {ckpt_dir / 'sft_final.pt'}")
 
     # ── Save metrics JSON in same schema as MAPPO ─────────────────────────────
