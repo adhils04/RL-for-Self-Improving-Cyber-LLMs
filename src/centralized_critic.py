@@ -11,7 +11,15 @@ class CentralizedCritic(nn.Module):
     """
     def __init__(self, model_name_or_path, device="cuda", lr: float = 1e-5):
         super(CentralizedCritic, self).__init__()
-        self.device = device
+        if device == "auto":
+            if torch.cuda.is_available():
+                self.device = "cuda"
+            elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+                self.device = "mps"
+            else:
+                self.device = "cpu"
+        else:
+            self.device = device
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False)
         # Ensure padding token exists for batch processing
@@ -22,7 +30,8 @@ class CentralizedCritic(nn.Module):
         self.model = AutoModelForSequenceClassification.from_pretrained(
             model_name_or_path,
             num_labels=1,
-            torch_dtype=torch.float32,
+            dtype=torch.float32,
+            attn_implementation="eager",
         ).to(self.device)
 
         # Bug fix #10: lr is now config-driven (default kept for backward compat)
@@ -39,7 +48,7 @@ class CentralizedCritic(nn.Module):
             return_tensors="pt", 
             padding=True, 
             truncation=True, 
-            max_length=2048
+            max_length=512
         ).to(self.device)
         
         # Forward pass to get logits (which act as our scalar value)

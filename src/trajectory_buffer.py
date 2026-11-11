@@ -42,7 +42,13 @@ class CTDETrajectoryBuffer:
         self.values.append(value)
         self.dones.append(done)
 
-    def compute_returns_and_advantages(self, gamma=0.99, gae_lambda=0.95, for_defender=False):
+    def compute_returns_and_advantages(
+        self,
+        gamma=0.99,
+        gae_lambda=0.95,
+        for_defender=False,
+        critic_tracks_defender=False,
+    ):
         """
         Computes GAE using the Centralized Critic's values.
         Supports both attacker rewards and defender rewards.
@@ -53,7 +59,10 @@ class CTDETrajectoryBuffer:
         
         # Append a bootstrap value of 0 for the end of the trajectory
         values = np.append(self.values, 0)
-        if for_defender:
+        if critic_tracks_defender:
+            if not for_defender:
+                values = -values
+        elif for_defender:
             # For defender, value function sign is oriented to defender returns
             values = -values 
         

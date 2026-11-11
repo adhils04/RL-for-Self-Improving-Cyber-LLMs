@@ -309,9 +309,10 @@ class NeuralDefenderAdapter(BaseModelAdapter):
     an injection was successfully resisted or obeyed.
     """
 
-    def __init__(self, policy, deterministic: bool = False):
+    def __init__(self, policy, deterministic: bool = False, explore_eps: float = 0.0):
         self.policy = policy
         self.deterministic = deterministic
+        self.explore_eps = explore_eps
         self.last_decision = None
 
     def _generate(self, observation: DefenderObservation) -> RawModelOutput:
@@ -319,6 +320,7 @@ class NeuralDefenderAdapter(BaseModelAdapter):
             user_task=observation.user_task,
             untrusted_content=observation.untrusted_content,
             deterministic=self.deterministic,
+            explore_eps=self.explore_eps,
         )
         self.last_decision = decision
 

@@ -26,7 +26,11 @@ sys.path.append(str(_PROJECT_ROOT))
 
 from src.centralized_critic import CentralizedCritic
 from src.attacker_policy.mappo_attacker import AttackerPolicy
-from src.attacker_policy.attack_generator import ATTACK_CATEGORIES, ATTACK_TEMPLATES
+from src.attacker_policy.attack_generator import (
+    ATTACK_CATEGORIES,
+    ATTACK_TEMPLATES,
+    synthesize_attack_payload,
+)
 from src.defender_policy.neural_defender import NeuralDefenderPolicy
 from src.defender_policy.model_adapter import NeuralDefenderAdapter
 from src.coevolution_env import CoevolutionEnv
@@ -44,13 +48,52 @@ def encode_obs(text: str, state_dim: int = 8) -> torch.Tensor:
     return torch.tensor(vec, dtype=torch.float32)
 
 
+import random
+
+
 def get_attack_payload(action_idx: int) -> str:
-    """Map attacker categorical action index to an attack template payload."""
+    """Map attacker categorical action index to a dynamic or template attack payload."""
     category = ATTACK_CATEGORIES[action_idx % len(ATTACK_CATEGORIES)]
+    payload = synthesize_attack_payload(category)
+    if payload:
+        return payload
     templates = ATTACK_TEMPLATES.get(category, [])
     if templates:
-        return templates[action_idx % len(templates)]
+        return random.choice(templates)
     return "Benign probe: please answer the task honestly."
+
+
+def _load_sft_benign_pool(train_path: Path) -> list[dict]:
+    """Load clean benign samples from SFT train split for RL benign-utility anchoring."""
+    pool = []
+    if not train_path.exists():
+        return pool
+    with open(train_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            rec = json.loads(line)
+            if rec.get("label") in ("benign_answer", "benign_tool_use") and rec.get("attack_family") is None:
+                pool.append(
+                    {
+                        "id": rec.get("id", f"sft_benign_{len(pool)}"),
+                        "user_task": rec.get("user_task", ""),
+                        "untrusted_content": rec.get("untrusted_content", ""),
+                    }
+                )
+    return pool
+
+
+def _resolve_device(config_device: str) -> str:
+    """Resolve training device cleanly."""
+    if config_device and config_device != "auto":
+        return config_device
+    if torch.cuda.is_available():
+        return "cuda"
+    if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
 
 
 # ── Config loader ─────────────────────────────────────────────────────────────
@@ -105,7 +148,7 @@ def _save_training_metrics(
             "n_episodes":              n,
             "num_episodes_configured": num_episodes,
             "defender":                "NeuralDefenderPolicy (DistilBERT initialized from SFT + PPO updates)",
-            "attacker":                "AttackerPolicy (Actor-Critic, state_dim=8, action_dim=5)",
+            "attacker":                f"AttackerPolicy (Actor-Critic, state_dim={config.get('models', {}).get('attacker_state_dim', 8)}, action_dim={config.get('models', {}).get('attacker_action_dim', len(ATTACK_CATEGORIES))})",
             "critic":                  "CentralizedCritic (DistilBERT regression head, V(S))",
             "gamma":                   config["training"]["gamma"],
             "gae_lambda":              config["training"]["gae_lambda"],
@@ -133,26 +176,29 @@ def main(config_path=None):
     config = load_config(config_path)
 
     # Device selection
-    device = "cpu"
-    print(f"[*] Initializing MAPPO Co-evolution on device: {device}")
+    device = _resolve_device(config.get("models", {}).get("device", "auto"))
+    print(f"[*] Initializing MAPPO Co-evolution on device: {device}", flush=True)
 
     # Hyperparameters
     gamma         = config["training"]["gamma"]
     gae_lambda    = config["training"]["gae_lambda"]
     ppo_epochs    = config["training"]["ppo_epochs"]
     clip_epsilon  = config["training"]["clip_epsilon"]
-    actor_lr      = config["training"].get("actor_lr", 2e-5)
+    actor_lr      = config["training"].get("actor_lr", 3e-5)
     critic_lr     = config["training"].get("critic_lr", 2e-5)
-    defender_lr   = config["training"].get("defender_lr", 2e-5)
-    num_episodes  = min(config["experiment"].get("num_episodes", 150), 150)
-    max_steps     = config["experiment"].get("max_steps_per_episode", 2)
+    defender_lr   = config["training"].get("defender_lr", 1.2e-5)
+    num_episodes  = int(config["experiment"].get("num_episodes", 220))
+    max_steps     = config["experiment"].get("max_steps_per_episode", 4)
     seed          = config["experiment"].get("seed", 42)
     batch_episodes = 5  # accumulate transitions across 5 episodes for stable PPO batches
 
-    state_dim  = config.get("models", {}).get("attacker_state_dim", 8)
-    action_dim = config.get("models", {}).get("attacker_action_dim", 5)
+    random.seed(seed)
+    torch.manual_seed(seed)
 
-    log_interval   = config.get("logging", {}).get("log_interval", 15)
+    state_dim  = config.get("models", {}).get("attacker_state_dim", 8)
+    action_dim = config.get("models", {}).get("attacker_action_dim", len(ATTACK_CATEGORIES))
+
+    log_interval   = config.get("logging", {}).get("log_interval", 20)
     output_dir     = _PROJECT_ROOT / config.get("logging", {}).get("output_dir", "reports")
     checkpoint_dir = _PROJECT_ROOT / config.get("logging", {}).get("checkpoint_dir", "checkpoints/mappo_run")
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -170,40 +216,102 @@ def main(config_path=None):
         learning_rate=actor_lr,
     )
     defender = NeuralDefenderPolicy(
-        model_name_or_path="distilbert-base-uncased",
+        model_name_or_path=config["models"].get("defender_model", "distilbert-base-uncased"),
         learning_rate=defender_lr,
         device=device,
     )
 
-    # Load SFT reference policy warm-up checkpoint
+    # Load SFT reference policy warm-up checkpoint and frozen KL anchor
     sft_ckpt_path = _PROJECT_ROOT / "checkpoints" / "sft_run" / "sft_final.pt"
+    ref_defender = None
     if sft_ckpt_path.exists():
-        print(f"[*] Initializing MAPPO Defender from SFT reference policy: {sft_ckpt_path}")
+        print(f"[*] Initializing MAPPO Defender from SFT reference policy: {sft_ckpt_path}", flush=True)
         defender.load_checkpoint(sft_ckpt_path)
+        ref_defender = NeuralDefenderPolicy(
+            model_name_or_path=config["models"].get("defender_model", "distilbert-base-uncased"),
+            learning_rate=defender_lr,
+            device=device,
+        )
+        ref_defender.load_checkpoint(sft_ckpt_path)
+        ref_defender.model.eval()
+        for p in ref_defender.model.parameters():
+            p.requires_grad_(False)
     else:
-        print("[!] SFT reference policy not found; starting Defender from base weights.")
+        print("[!] SFT reference policy not found; starting Defender from base weights.", flush=True)
 
-    defender_adapter = NeuralDefenderAdapter(policy=defender, deterministic=False)
+    defender_adapter = NeuralDefenderAdapter(policy=defender, deterministic=False, explore_eps=0.25)
 
     cases_path = _PROJECT_ROOT / "data" / "evaluation" / "benchmark_cases.jsonl"
+    sft_benign_pool = _load_sft_benign_pool(_PROJECT_ROOT / "data" / "sft" / "train.jsonl")
     env = CoevolutionEnv(
         defender_adapter=defender_adapter,
         cases_path=cases_path,
         max_steps=max_steps,
         seed=seed,
     )
+    env_benign_cases = [c for c in env._cases if c.get("kind") == "benign"]
+    env_attack_cases = [c for c in env._cases if c.get("kind") != "benign"] or list(env._cases)
     buffer = CTDETrajectoryBuffer()
+    batch_is_benign: list[bool] = []
 
     episode_records: list = []
 
-    print("[*] Starting MAPPO Co-evolution Training Loop (SFT-Warmup Defender + Attacker)...")
+    print("[*] Starting MAPPO Co-evolution Training Loop (SFT-Warmup Defender + Attacker)...", flush=True)
     global_step = 0
     running_critic_loss = 0.0
     running_atk_loss = 0.0
     running_def_loss = 0.0
 
     for episode in range(1, num_episodes + 1):
-        obs = env.reset()
+        # Anneal exploration smoothly from 0.30 -> 0.05 across episodes
+        progress = (episode - 1) / max(num_episodes - 1, 1)
+        defender_adapter.explore_eps = 0.30 * (1.0 - progress) + 0.05 * progress
+
+        # 40% benign calibration episodes (benchmark + diverse SFT benign), 60% adversarial
+        is_benign_ep = random.random() < 0.40
+        if is_benign_ep and (sft_benign_pool or env_benign_cases):
+            benign_turns = []
+            first_task = ""
+            for t_idx in range(max_steps):
+                if sft_benign_pool and (not env_benign_cases or random.random() < 0.80):
+                    item = random.choice(sft_benign_pool)
+                    u_task = "" if random.random() < 0.50 else item.get("user_task", "")
+                    benign_turns.append({
+                        "user_task": u_task,
+                        "untrusted_content": item["untrusted_content"],
+                        "expected_turn_outcome": "safe",
+                    })
+                    if t_idx == 0:
+                        first_task = u_task
+                else:
+                    ec = random.choice(env_benign_cases)
+                    ec_turns = ec.get("turns", [])
+                    uc = ec_turns[0].get("untrusted_content") if ec_turns else ec.get("user_task", "")
+                    u_task = "" if random.random() < 0.50 else ec.get("user_task", "")
+                    benign_turns.append({
+                        "user_task": u_task,
+                        "untrusted_content": uc,
+                        "expected_turn_outcome": "safe",
+                    })
+                    if t_idx == 0:
+                        first_task = u_task
+            selected_case = {
+                "id": f"mappo_benign_ep_{episode}",
+                "kind": "benign",
+                "attack_family": None,
+                "user_task": first_task,
+                "step_count": max_steps,
+                "turns": benign_turns,
+            }
+        else:
+            base_case = dict(random.choice(env_attack_cases))
+            # 50/50 split between contextual [TASK] and UI task-free [TASK] "" mode
+            if random.random() < 0.50:
+                base_case["user_task"] = ""
+            base_case["step_count"] = max_steps
+            selected_case = base_case
+
+        obs = env.reset(case=selected_case, episode_id=f"ep_{episode:04d}")
         episode_reward_atk  = 0.0
         episode_reward_def  = 0.0
         episode_asr_steps   = 0
@@ -218,16 +326,34 @@ def main(config_path=None):
             global_step         += 1
             episode_steps_count += 1
 
+            step_idx = getattr(env, "_step_index", 0)
+            curr_case = getattr(env, "_current_case", {}) or {}
+            step_is_benign = curr_case.get("kind") == "benign"
+
+            # Per-step benign task refresh when synthesizing multi-turn benign episodes
+            if step_is_benign:
+                turns = curr_case.get("turns", [])
+                if step_idx < len(turns):
+                    curr_case["user_task"] = turns[step_idx].get("user_task", curr_case.get("user_task", ""))
+
             task_desc    = getattr(obs, "task_id", str(obs))
             state_tensor = encode_obs(task_desc, state_dim=state_dim)
 
-            # Attacker decision
+            # Attacker decision (used on adversarial turns)
             with torch.no_grad():
                 decision = attacker.get_action(state_tensor)
             atk_action_idx = decision.action
             atk_logprob    = decision.log_prob.detach()
 
-            atk_text    = get_attack_payload(atk_action_idx)
+            if step_is_benign:
+                turns = curr_case.get("turns", [])
+                if step_idx < len(turns) and turns[step_idx].get("untrusted_content"):
+                    atk_text = turns[step_idx]["untrusted_content"]
+                else:
+                    atk_text = curr_case.get("user_task", "Benign user query.")
+            else:
+                atk_text = get_attack_payload(atk_action_idx)
+
             step_result = env.step(atk_text)
 
             reward_atk = step_result.reward_attacker
@@ -245,11 +371,14 @@ def main(config_path=None):
             last_case_kind     = info.get("case_kind", "unknown")
             last_attack_family = info.get("attack_family")
 
-            # Centralized Critic Global State
+            # Pre-outcome Centralized Critic Global State V_def(S) (no reward leakage)
+            active_task = curr_case.get("user_task", "")
             global_state_text = (
-                f"Task: {task_desc} | Payload: {atk_text[:80]} | "
-                f"Reward_atk: {reward_atk:.2f} | Reward_def: {reward_def:.2f}"
+                f"Mode: {'benign' if step_is_benign else 'adversarial'} | "
+                f"Task: {active_task[:80]} | "
+                f"Content: {atk_text[:200]}"
             )
+            critic.model.eval()
             with torch.no_grad():
                 state_value = critic([global_state_text]).item()
 
@@ -262,7 +391,7 @@ def main(config_path=None):
                 atk_obs=state_tensor,
                 atk_action=atk_action_idx,
                 atk_logprob=atk_logprob,
-                def_obs=f"[TASK] {getattr(obs, 'user_task', task_desc)} [CONTENT] {atk_text}",
+                def_obs=f"[TASK] {active_task} [CONTENT] {atk_text}".strip(),
                 def_action=def_action_val,
                 def_logprob=def_lp_val,
                 reward=reward_atk,
@@ -270,6 +399,7 @@ def main(config_path=None):
                 done=done,
                 def_reward=reward_def,
             )
+            batch_is_benign.append(step_is_benign)
 
             obs = step_result.next_obs
 
@@ -279,59 +409,82 @@ def main(config_path=None):
 
         # ── Batch PPO Updates ─────────────────────────────────────────────
         if episode % batch_episodes == 0 or episode == num_episodes:
-            # Attacker returns & advantages
+            # Critic tracks Defender return V_def(S) cleanly
             returns, advantages = buffer.compute_returns_and_advantages(
                 gamma=gamma,
                 gae_lambda=gae_lambda,
                 for_defender=False,
+                critic_tracks_defender=True,
             )
-            # Defender returns & advantages
             def_returns, def_advantages = buffer.compute_returns_and_advantages(
                 gamma=gamma,
                 gae_lambda=gae_lambda,
                 for_defender=True,
+                critic_tracks_defender=True,
             )
 
-            # 1. Update Centralized Critic
-            critic_loss = critic.update_critic(buffer.global_states, returns)
+            # 1. Update Centralized Critic against Defender returns
+            critic_loss = critic.update_critic(buffer.global_states, def_returns)
             running_critic_loss = critic_loss
 
-            # 2. Update Attacker & Defender Actors
-            atk_states   = torch.stack(buffer.attacker_obs)
-            atk_actions  = torch.tensor(buffer.attacker_actions, dtype=torch.long)
-            atk_logprobs = torch.stack(buffer.attacker_logprobs).detach()
+            # 2. Update Attacker (adversarial turns only) & Defender Actors
+            adv_indices = [i for i, b in enumerate(batch_is_benign) if not b]
+            def_states = buffer.defender_obs
+            def_actions = torch.tensor(buffer.defender_actions, dtype=torch.long)
+            def_logprobs = torch.tensor(buffer.defender_logprobs, dtype=torch.float32)
+
+            ref_logits = None
+            kl_weights = None
+            if ref_defender is not None and def_states:
+                with torch.no_grad():
+                    ref_logits = ref_defender.forward(def_states).detach()
+                kl_weights = torch.tensor(
+                    [1.0 if b else 0.015 for b in batch_is_benign],
+                    dtype=torch.float32,
+                )
+
+            if len(adv_indices) >= 2:
+                atk_states   = torch.stack([buffer.attacker_obs[i] for i in adv_indices])
+                atk_actions  = torch.tensor([buffer.attacker_actions[i] for i in adv_indices], dtype=torch.long)
+                atk_logprobs = torch.stack([buffer.attacker_logprobs[i] for i in adv_indices]).detach()
+                atk_adv_sub  = advantages[adv_indices]
+                atk_ret_sub  = returns[adv_indices]
+            else:
+                atk_states = None
 
             for _ in range(ppo_epochs):
-                try:
-                    loss_dict = attacker.ppo_update(
-                        states=atk_states,
-                        actions=atk_actions,
-                        old_log_probs=atk_logprobs,
-                        advantages=advantages,
-                        returns=returns,
-                        clip_epsilon=clip_epsilon,
-                    )
-                    running_atk_loss = loss_dict["total_loss"]
-                except Exception:
-                    pass
+                if atk_states is not None:
+                    try:
+                        loss_dict = attacker.ppo_update(
+                            states=atk_states,
+                            actions=atk_actions,
+                            old_log_probs=atk_logprobs,
+                            advantages=atk_adv_sub,
+                            returns=atk_ret_sub,
+                            clip_epsilon=clip_epsilon,
+                        )
+                        running_atk_loss = loss_dict["total_loss"]
+                    except Exception as exc:
+                        print(f"[!] Attacker PPO update warning: {exc}", flush=True)
 
                 try:
-                    def_states = buffer.defender_obs
-                    def_actions = torch.tensor(buffer.defender_actions, dtype=torch.long)
-                    def_logprobs = torch.tensor(buffer.defender_logprobs, dtype=torch.float32)
-
                     def_loss_dict = defender.ppo_update(
                         obs_texts=def_states,
                         actions=def_actions,
                         old_log_probs=def_logprobs,
                         advantages=def_advantages,
                         clip_epsilon=clip_epsilon,
+                        entropy_coeff=0.015,
+                        beta_kl=0.25 if ref_logits is not None else 0.05,
+                        ref_logits=ref_logits,
+                        kl_weights=kl_weights,
                     )
                     running_def_loss = def_loss_dict["total_loss"]
-                except Exception:
-                    pass
+                except Exception as exc:
+                    print(f"[!] Defender PPO update warning: {exc}", flush=True)
 
             buffer.clear()
+            batch_is_benign.clear()
 
         episode_records.append(
             {
@@ -357,15 +510,16 @@ def main(config_path=None):
                 f"Def R: {episode_reward_def:+.2f} | "
                 f"ASR: {episode_asr:.3f} | "
                 f"Critic Loss: {running_critic_loss:.4f} | "
-                f"Def Loss: {running_def_loss:.4f}"
+                f"Def Loss: {running_def_loss:.4f}",
+                flush=True,
             )
             _save_training_metrics(episode_records, output_dir, config, num_episodes)
 
     # ── Final Save ────────────────────────────────────────────────────────────
-    torch.save(attacker.state_dict(), checkpoint_dir / "attacker_final.pt")
-    torch.save(critic.state_dict(),   checkpoint_dir / "critic_final.pt")
+    torch.save({k: v.detach().cpu() for k, v in attacker.state_dict().items()}, checkpoint_dir / "attacker_final.pt")
+    torch.save({k: v.detach().cpu() for k, v in critic.state_dict().items()},   checkpoint_dir / "critic_final.pt")
     defender.save_checkpoint(checkpoint_dir / "mappo_defender_final.pt")
-    print(f"\n[✓] MAPPO Defender checkpoint saved → {checkpoint_dir / 'mappo_defender_final.pt'}")
+    print(f"\n[✓] MAPPO Defender checkpoint saved → {checkpoint_dir / 'mappo_defender_final.pt'}", flush=True)
 
     metrics_path = _save_training_metrics(episode_records, output_dir, config, num_episodes)
     print(f"[✓] MAPPO Training Complete → Metrics: {metrics_path}")
