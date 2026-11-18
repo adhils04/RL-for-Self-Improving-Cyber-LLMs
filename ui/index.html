@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MAPPO-Sec</title>
-    <meta name="description" content="Empirical research arena demonstrating that Multi-Agent PPO (MAPPO) outperforms Supervised Fine-Tuning (SFT) in defending LLMs against prompt injection attacks.">
+    <meta name="description" content="Interactive interface for exploring a prompt-injection defense research prototype.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -44,33 +44,9 @@
                 </div>
             </div>
 
-            <!-- Empirical Benchmark Summary Card -->
             <div class="sidebar-section">
-                <div class="section-label">
-                    <span>Empirical Benchmark (B=30)</span>
-                </div>
-                <div class="metrics-card">
-                    <div class="metric-row">
-                        <span class="metric-name">Novel Attack Def.</span>
-                        <span class="metric-val win">100.0% vs 47.4%</span>
-                    </div>
-                    <div class="metric-row">
-                        <span class="metric-name">Novel Attack ASR</span>
-                        <span class="metric-val win">0.0% vs 52.6%</span>
-                    </div>
-                    <div class="metric-row">
-                        <span class="metric-name">Welch's t-test</span>
-                        <span class="metric-val stat-sig">t = +30.98, p &lt; 10⁻⁶</span>
-                    </div>
-                    <div class="metric-row">
-                        <span class="metric-name">Cohen's d Effect</span>
-                        <span class="metric-val stat-sig">d = +8.00 (Large)</span>
-                    </div>
-                    <div class="metric-row">
-                        <span class="metric-name">Defender Reward</span>
-                        <span class="metric-val win">+2.80 vs +1.70</span>
-                    </div>
-                </div>
+                <div class="section-label readable-new-label"><span>Evaluation status</span></div>
+                <p>Comparative classifier results are pending external training and a new confirmatory evaluation. The current interface is a research prototype.</p>
             </div>
 
             <!-- Session Stats -->
@@ -92,8 +68,8 @@
                         <div class="stat-label">Total Prompts</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value" id="stat-asr-delta" style="color:var(--success-text);">-100%</div>
-                        <div class="stat-label">ASR Reduction</div>
+                        <div class="stat-value" id="stat-unsafe-allow-delta" style="color:var(--text-muted);">--</div>
+                        <div class="stat-label readable-new-label" title="Difference in allow rates among locally heuristic-flagged prompts">Heuristic unsafe allow Δ</div>
                     </div>
                 </div>
             </div>
@@ -130,8 +106,9 @@
             <!-- Policy Gate Reference -->
             <div class="sidebar-section">
                 <div class="section-label">
-                    <span>Policy Gate Enforcement</span>
+                    <span class="readable-new-label">Training gate rules</span>
                 </div>
+                <p>These rules belong to the training environment; this demo does not invoke the gate.</p>
                 <div class="gate-rules-list">
                     <div class="gate-rule-item" id="rule-GATE-003">GATE-003 · Defensive Barrier</div>
                     <div class="gate-rule-item" id="rule-GATE-005">GATE-005 · Secret Protection</div>
@@ -153,10 +130,10 @@
                 <section class="welcome-hero" id="welcome-hero" aria-label="Evaluation Overview">
                     <div class="hero-header">
                         <div class="hero-title-group">
-                            <span class="hero-pill-badge">Online · Neural Checkpoints Loaded</span>
-                            <h2 class="hero-title">Adversarial Robustness Evaluation Arena</h2>
+                            <span class="hero-pill-badge readable-new-label">Classifier demo · trained checkpoints required</span>
+                            <h2 class="hero-title">Prompt Classification Prototype</h2>
                             <p class="hero-desc">
-                                Co-evolved under Centralized Training with Decentralized Execution (CTDE). The MAPPO Defender learns an invariant zero-trust boundary against zero-day prompt injection vectors where static SFT baselines fail.
+                                Compares binary allow or defend predictions. This interface does not invoke a generative model, execute tools, or establish secret disclosure behavior.
                             </p>
                         </div>
                     </div>
@@ -250,6 +227,13 @@
                 document.getElementById('stat-mappo-blocks').textContent = d.mappo_blocks;
                 document.getElementById('stat-sft-blocks').textContent = d.sft_blocks;
                 document.getElementById('stat-evals').textContent = d.total_evaluations;
+                const delta = document.getElementById('stat-unsafe-allow-delta');
+                if (d.mappo_heuristic_cases + d.sft_heuristic_cases > 0) {
+                    const pp = (d.mappo_heuristic_unsafe_allow_rate - d.sft_heuristic_unsafe_allow_rate) * 100;
+                    delta.textContent = `${pp >= 0 ? '+' : ''}${pp.toFixed(1)} pp`;
+                } else {
+                    delta.textContent = '--';
+                }
             } catch (_) {}
         }
 
@@ -281,8 +265,8 @@
             div.id = 'typing-indicator';
             div.innerHTML = `
                 <div class="avatar arena-avatar">EV</div>
-                <div class="content" style="color:var(--text-muted); font-size:0.80rem;">
-                    Evaluating neural policy decisions across checkpoints...
+                <div class="content" style="color:var(--text-muted); font-size:0.875rem;">
+                    Checking classifier availability and decision...
                 </div>
             `;
             chatContainer.appendChild(div);
@@ -292,26 +276,28 @@
 
         function renderModelCard(evalData, isMappo) {
             const isDefended = evalData.action === 1;
-            const isLeak = evalData.status === 'leak';
+            const isUnsafeAllow = evalData.status === 'unsafe_allow';
 
             let badgeClass = 'model-badge defended';
-            let badgeText = 'DEFENDED';
+            let badgeText = 'DEFEND PREDICTION';
             let gateHtml = '';
 
-            if (isDefended) {
-                badgeClass = 'model-badge defended';
-                badgeText = 'DEFENDED';
-                const ruleName = evalData.gate_rule || 'POLICY-GATE';
-                const ruleDesc = evalData.gate_reason || 'Injection blocked';
-                gateHtml = `<span class="gate-status gate-status--blocked">Blocked · ${escapeHtml(ruleName)}</span>: ${escapeHtml(ruleDesc)}`;
-            } else if (isLeak) {
+            if (evalData.status === 'error') {
                 badgeClass = 'model-badge vulnerable';
-                badgeText = 'COMPROMISED';
-                gateHtml = `<span class="gate-status gate-status--bypassed">Boundary Bypassed</span>: Malicious payload executed`;
+                badgeText = 'UNAVAILABLE';
+                gateHtml = escapeHtml(evalData.response);
+            } else if (isDefended) {
+                badgeClass = 'model-badge defended';
+                badgeText = 'DEFEND PREDICTION';
+                gateHtml = 'Classifier-only decision; no policy gate or tool execution was performed.';
+            } else if (isUnsafeAllow) {
+                badgeClass = 'model-badge vulnerable';
+                badgeText = 'UNSAFE ALLOW PREDICTION';
+                gateHtml = 'Local keyword heuristic flagged this input; no content was executed and no secret was retrieved.';
             } else {
                 badgeClass = 'model-badge benign';
-                badgeText = 'ALLOWED (BENIGN)';
-                gateHtml = `<span class="gate-status gate-status--benign">Benign Input Processed</span>`;
+                badgeText = 'ALLOW PREDICTION';
+                gateHtml = 'Classifier-only decision; no generative response or tool execution was performed.';
             }
 
             const cardClass = isMappo ? 'model-card mappo-card' : 'model-card sft-card';

@@ -8,27 +8,20 @@ data/sft/train.jsonl dataset using cross-entropy loss.  This is the canonical
 SFT approach: learn a fixed mapping (prompt + untrusted_content) → (safe/unsafe)
 from human-labeled examples.
 
-Key differences from MAPPO
----------------------------
-- SFT trains on a **static, closed dataset** (21 labeled examples in train.jsonl).
-  It cannot adapt when the attacker generates novel injection templates not present
-  in training.
-- MAPPO trains via **reward signals from the live environment**: every episode the
-  attacker can adapt, and the centralized critic propagates global-state information
-  back to both agents.  This co-evolutionary pressure is the core MAPPO advantage.
+Scope
+-----
+This script trains a DistilBERT binary sequence classifier. It is separate from
+the Qwen2.5-0.5B language-model SFT smoke test and does not train a response-
+generating language model or execute tools.
 
 Metrics logged (written to reports/sft_training_metrics.json)
 -------------------------------------------------------------
   - epoch                : training epoch index (1-indexed)
   - train_loss           : cross-entropy loss on training set
   - train_accuracy       : classification accuracy on training set
-  - heldout_accuracy     : accuracy on held-out test scenarios  ← key metric
-  - heldout_asr          : attack success rate on heldout set (fraction NOT defended)
-  - defender_reward      : reward signal computed using the same reward formula
-                           as MAPPO, so the two conditions are directly comparable
-  - attacker_reward      : inverse of defender reward (attacker wins ↔ defender fails)
-  - novel_attack_accuracy: accuracy specifically on novel attack families in heldout
-                           (not seen in training) — the primary MAPPO advantage axis
+  - validation_accuracy  : accuracy on validation scenarios, reported each epoch
+  - final_heldout        : held-out metrics evaluated once after training
+  - validation_novel_attack_accuracy: accuracy on novel families in validation
 
 Usage
 -----
@@ -37,7 +30,9 @@ Usage
 
 from __future__ import annotations
 
+import hashlib
 import json
+import random
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -53,6 +48,7 @@ sys.path.append(str(PROJECT_ROOT))
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 TRAIN_PATH   = PROJECT_ROOT / "data" / "sft" / "train.jsonl"
+VALIDATION_PATH = PROJECT_ROOT / "data" / "sft" / "validation.jsonl"
 HELDOUT_PATH = PROJECT_ROOT / "data" / "sft" / "heldout.jsonl"
 REPORTS_DIR  = PROJECT_ROOT / "reports"
 
@@ -65,6 +61,48 @@ REWARD_DEFEND_SUCCESS = +3.0   # defender correctly resists attack
 REWARD_BENIGN_CORRECT = +2.0   # defender correctly handles benign
 REWARD_ATTACK_SUCCESS = -2.0   # attacker wins (injection obeyed / refusal wrong)
 REWARD_ATTACK_WIN_ATK = +1.0   # attacker perspective when attack succeeds
+
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def validate_split_integrity(paths):
+    """Reject duplicate IDs, scenarios, or exact inputs across data splits."""
+    split_rows = {}
+    for split_name, path in paths.items():
+        if not path.is_file():
+            raise FileNotFoundError(f"Required {split_name} split is missing: {path}")
+        rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        if not rows:
+            raise ValueError(f"The {split_name} split is empty: {path}")
+        split_rows[split_name] = rows
+
+    keys = ("id", "scenario_id")
+    for key in keys:
+        owners = {}
+        for split_name, rows in split_rows.items():
+            for row in rows:
+                value = row.get(key)
+                if not value:
+                    continue
+                if value in owners:
+                    raise ValueError(f"{key} overlap between {owners[value]} and {split_name}: {value}")
+                owners[value] = split_name
+
+    owners = {}
+    for split_name, rows in split_rows.items():
+        for row in rows:
+            fingerprint = (row.get("user_task", "").strip(), row.get("untrusted_content", "").strip())
+            if fingerprint in owners:
+                raise ValueError(f"Exact task/content duplicate between {owners[fingerprint]} and {split_name}")
+            owners[fingerprint] = split_name
+    return split_rows
 
 
 # ── Dataset ───────────────────────────────────────────────────────────────────
@@ -90,6 +128,8 @@ class InjectionDataset(Dataset):
                 untrusted = rec.get("untrusted_content", "")
                 text = f"[TASK] {user_task} [CONTENT] {untrusted}"
                 label_str = rec.get("label", "benign_answer")
+                if label_str not in SAFE_LABELS | UNSAFE_LABELS:
+                    raise ValueError(f"Unsupported label {label_str!r} in {jsonl_path}")
                 # 1 = must resist (attack/unsafe), 0 = safe to answer
                 label = 1 if label_str in UNSAFE_LABELS else 0
                 attack_family = rec.get("attack_family")
@@ -173,6 +213,56 @@ def compute_sft_reward(
             return -1.0, 0.5              # mild penalty for unnecessary refusal
 
 
+def evaluate_classifier(model, loader, dataset, train_families, device):
+    """Evaluate one split and return its aggregate classification metrics."""
+    model.eval()
+    predictions = []
+    with torch.no_grad():
+        for batch in loader:
+            ids = batch["input_ids"].to(device)
+            mask = batch["attention_mask"].to(device)
+            predictions.extend(model(input_ids=ids, attention_mask=mask).logits.argmax(dim=-1).cpu().tolist())
+
+    correct = id_correct = novel_correct = benign_correct = 0
+    id_total = novel_total = benign_total = attack_total = attack_errors = 0
+    reward_sum = 0.0
+    for pred, sample in zip(predictions, dataset.samples):
+        label = sample["label"]
+        label_str = sample["label_str"]
+        family = sample["attack_family"]
+        is_novel = bool(sample["is_novel"] or (family and family not in train_families))
+        correct += int(pred == label)
+        if label_str in UNSAFE_LABELS:
+            attack_total += 1
+            attack_errors += int(pred != 1)
+            if is_novel:
+                novel_total += 1
+                novel_correct += int(pred == label)
+            else:
+                id_total += 1
+                id_correct += int(pred == label)
+        else:
+            benign_total += 1
+            benign_correct += int(pred == 0)
+        reward_sum += compute_sft_reward(pred, label, label_str)[0]
+
+    n = max(len(dataset), 1)
+    return {
+        "accuracy": correct / n,
+        "attack_success_rate": attack_errors / max(attack_total, 1),
+        "in_distribution_accuracy": id_correct / max(id_total, 1),
+        "in_distribution_attack_success_rate": (id_total - id_correct) / max(id_total, 1),
+        "novel_attack_accuracy": novel_correct / max(novel_total, 1),
+        "novel_attack_success_rate": (novel_total - novel_correct) / max(novel_total, 1),
+        "benign_accuracy": benign_correct / max(benign_total, 1),
+        "mean_defender_reward": reward_sum / n,
+        "n_cases": len(dataset),
+        "n_attacks": attack_total,
+        "n_novel_attacks": novel_total,
+        "n_benign": benign_total,
+    }
+
+
 # ── Main SFT trainer ─────────────────────────────────────────────────────────
 
 def run_sft_baseline(
@@ -181,6 +271,7 @@ def run_sft_baseline(
     batch_size: int = 4,
     max_length: int = 128,
     model_name: str = "distilbert-base-uncased",
+    seed: int = 42,
 ) -> Path:
     """Train SFT classifier and return path to metrics JSON."""
     from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -192,10 +283,15 @@ def run_sft_baseline(
     print(f"  Epochs  : {epochs}")
     print(f"  LR      : {lr}")
     print(f"  Train   : {TRAIN_PATH}")
-    print(f"  Heldout : {HELDOUT_PATH}")
+    print(f"  Validation: {VALIDATION_PATH}")
+    print(f"  Final held-out: {HELDOUT_PATH}")
     print()
 
-    torch.manual_seed(42)
+    validate_split_integrity({"train": TRAIN_PATH, "validation": VALIDATION_PATH, "heldout": HELDOUT_PATH})
+    random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
     if torch.cuda.is_available():
         device = "cuda"
@@ -218,19 +314,18 @@ def run_sft_baseline(
     train_ds   = InjectionDataset(
         TRAIN_PATH, tokenizer, max_length, include_taskfree=True
     )
+    validation_ds = InjectionDataset(VALIDATION_PATH, tokenizer, max_length)
     heldout_ds = InjectionDataset(HELDOUT_PATH, tokenizer, max_length)
 
     train_loader   = DataLoader(train_ds,   batch_size=batch_size, shuffle=True)
-    heldout_loader = DataLoader(heldout_ds, batch_size=16,         shuffle=False)
+    validation_loader = DataLoader(validation_ds, batch_size=16, shuffle=False)
+    heldout_loader = DataLoader(heldout_ds, batch_size=16, shuffle=False)
 
     print(f"  Train examples   : {len(train_ds)}")
-    print(f"  Heldout examples : {len(heldout_ds)}")
+    print(f"  Validation examples: {len(validation_ds)}")
 
     # Identify attack families in heldout but NOT in train → novelty axis
     train_families  = {s["attack_family"] for s in train_ds.samples if s["attack_family"]}
-    heldout_families = {s["attack_family"] for s in heldout_ds.samples if s["attack_family"]}
-    novel_families  = heldout_families - train_families
-    print(f"  Novel attack families (heldout-only): {novel_families or 'none'}")
     print()
 
     # ── Training loop ─────────────────────────────────────────────────────────
@@ -263,107 +358,29 @@ def run_sft_baseline(
         avg_train_loss = train_loss / max(train_total, 1)
         train_accuracy = train_correct / max(train_total, 1)
 
-        # ── Heldout evaluation ────────────────────────────────────────────────
-        model.eval()
-        heldout_correct    = 0
-        heldout_total      = 0
-        heldout_asr_steps  = 0   # attacker wins = defender failed on attack sample
-        id_correct         = 0
-        id_total           = 0
-        id_asr_steps       = 0
-        novel_correct      = 0
-        novel_total        = 0
-        novel_asr_steps    = 0
-        benign_correct     = 0
-        benign_total       = 0
-        ep_def_reward      = 0.0
-        ep_atk_reward      = 0.0
-
-        with torch.no_grad():
-            for batch in heldout_loader:
-                ids  = batch["input_ids"].to(device)
-                mask = batch["attention_mask"].to(device)
-                logits = model(input_ids=ids, attention_mask=mask).logits
-                preds = logits.argmax(dim=-1).cpu().tolist()
-
-                lbls_b = batch["label"].tolist()
-                lbl_strs_b = batch["label_str"]
-                atk_fams_b = batch["attack_family"]
-                is_nov_raw = batch["is_novel"]
-                is_nov_b = (
-                    is_nov_raw.tolist()
-                    if isinstance(is_nov_raw, torch.Tensor)
-                    else list(is_nov_raw)
-                )
-
-                for pred, lbl, lbl_str, atk_fam, is_nov_val in zip(
-                    preds, lbls_b, lbl_strs_b, atk_fams_b, is_nov_b
-                ):
-                    is_novel_sample = bool(is_nov_val)
-                    heldout_total += 1
-                    if pred == lbl:
-                        heldout_correct += 1
-
-                    is_attack = lbl_str in UNSAFE_LABELS
-                    if is_attack and pred != 1:
-                        heldout_asr_steps += 1
-
-                    # Sub-category tracking
-                    if not is_attack:
-                        benign_total += 1
-                        if pred == 0:
-                            benign_correct += 1
-                    elif is_novel_sample or atk_fam in novel_families:
-                        novel_total += 1
-                        if pred == lbl:
-                            novel_correct += 1
-                        else:
-                            novel_asr_steps += 1
-                    else:
-                        id_total += 1
-                        if pred == lbl:
-                            id_correct += 1
-                        else:
-                            id_asr_steps += 1
-
-                    # Reward computation
-                    def_r, atk_r = compute_sft_reward(pred, lbl, lbl_str)
-                    ep_def_reward += def_r
-                    ep_atk_reward += atk_r
-
-        heldout_accuracy     = heldout_correct / max(heldout_total, 1)
-        heldout_asr          = heldout_asr_steps / max(
-            sum(1 for s in heldout_ds.samples if s["label_str"] in UNSAFE_LABELS), 1
+        # The validation split is used for epoch monitoring. The held-out split
+        # is not touched until training is complete.
+        validation_metrics = evaluate_classifier(
+            model, validation_loader, validation_ds, train_families, device
         )
-        novel_accuracy       = novel_correct / max(novel_total, 1)
-        novel_asr            = novel_asr_steps / max(novel_total, 1)
-        id_accuracy          = id_correct / max(id_total, 1)
-        id_asr               = id_asr_steps / max(id_total, 1)
-        benign_accuracy      = benign_correct / max(benign_total, 1)
-
-        avg_def_reward       = ep_def_reward / max(heldout_total, 1)
-        avg_atk_reward       = ep_atk_reward / max(heldout_total, 1)
 
         record = {
             "episode":               epoch,
             "global_step":           epoch,
             "train_loss":            round(avg_train_loss, 6),
             "train_accuracy":        round(train_accuracy, 4),
-            "heldout_accuracy":      round(heldout_accuracy, 4),
-            "asr":                   round(heldout_asr, 4),
-            "id_accuracy":           round(id_accuracy, 4),
-            "id_asr":                round(id_asr, 4),
-            "novel_attack_accuracy": round(novel_accuracy, 4),
-            "novel_asr":             round(novel_asr, 4),
-            "benign_accuracy":       round(benign_accuracy, 4),
-            "defender_reward":       round(avg_def_reward, 4),
-            "attacker_reward":       round(avg_atk_reward, 4),
+            "validation_accuracy": round(validation_metrics["accuracy"], 4),
+            "validation_attack_success_rate": round(validation_metrics["attack_success_rate"], 4),
+            "validation_novel_attack_accuracy": round(validation_metrics["novel_attack_accuracy"], 4),
+            "validation_benign_accuracy": round(validation_metrics["benign_accuracy"], 4),
+            "validation_defender_reward": round(validation_metrics["mean_defender_reward"], 4),
             "critic_loss":           0.0,
-            "attacker_loss":         round(avg_train_loss, 6),
+            "attacker_loss":         0.0,
+            "sft_cross_entropy":     round(avg_train_loss, 6),
             "gate_block_rate":       0.0,
             "kl_divergence":         0.0,
             "pre_gate_unsafe_rate":  0.0,
-            "case_kind":             "sft_eval",
+            "case_kind":             "sft_validation",
             "attack_family":         None,
         }
         episode_records.append(record)
@@ -373,11 +390,10 @@ def run_sft_baseline(
                 f"[Epoch {epoch:>3}/{epochs}]  "
                 f"Train Loss: {avg_train_loss:.4f} | "
                 f"Train Acc: {train_accuracy:.3f} | "
-                f"Heldout Acc: {heldout_accuracy:.3f} | "
-                f"ID Acc: {id_accuracy:.3f} | "
-                f"Novel Acc: {novel_accuracy:.3f} | "
-                f"Benign Acc: {benign_accuracy:.3f} | "
-                f"ASR: {heldout_asr:.3f}",
+                f"Validation Acc: {validation_metrics['accuracy']:.3f} | "
+                f"Novel Acc: {validation_metrics['novel_attack_accuracy']:.3f} | "
+                f"Benign Acc: {validation_metrics['benign_accuracy']:.3f} | "
+                f"ASR: {validation_metrics['attack_success_rate']:.3f}",
                 flush=True,
             )
 
@@ -385,8 +401,12 @@ def run_sft_baseline(
     ckpt_dir = PROJECT_ROOT / "checkpoints" / "sft_run"
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     cpu_state = {k: v.detach().cpu() for k, v in model.state_dict().items()}
-    torch.save(cpu_state, ckpt_dir / "sft_final.pt")
-    print(f"\n[✓] SFT model checkpoint saved → {ckpt_dir / 'sft_final.pt'}")
+    checkpoint_path = ckpt_dir / "sft_final.pt"
+    torch.save(cpu_state, checkpoint_path)
+    print(f"\n[✓] SFT model checkpoint saved → {checkpoint_path}")
+
+    # Final evaluation only: held-out data is accessed once after training.
+    heldout_metrics = evaluate_classifier(model, heldout_loader, heldout_ds, train_families, device)
 
     # ── Save metrics JSON in same schema as MAPPO ─────────────────────────────
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -395,20 +415,21 @@ def run_sft_baseline(
     asr_vs_step = [
         {
             "global_step":          r["episode"],
-            "asr":                  r["asr"],
-            "defender_reward":      r["defender_reward"],
-            "attacker_reward":      r["attacker_reward"],
+            "asr":                  r["validation_attack_success_rate"],
+            "defender_reward":      r["validation_defender_reward"],
+            "attacker_reward":      0.0,
             "critic_loss":          0.0,
-            "attacker_loss":        r["train_loss"],
+            "attacker_loss":        0.0,
             "defender_loss":        r["train_loss"],
+            "sft_cross_entropy":    r["train_loss"],
             "gate_block_rate":      0.0,
             "kl_divergence":        0.0,
             "pre_gate_unsafe_rate": 0.0,
             "train_loss":           r["train_loss"],
             "train_accuracy":       r["train_accuracy"],
-            "heldout_accuracy":     r["heldout_accuracy"],
-            "novel_attack_accuracy": r["novel_attack_accuracy"],
-            "case_kind":            "sft_eval",
+            "validation_accuracy":  r["validation_accuracy"],
+            "validation_novel_attack_accuracy": r["validation_novel_attack_accuracy"],
+            "case_kind":            "sft_validation",
             "attack_family":        None,
         }
         for r in episode_records
@@ -423,25 +444,26 @@ def run_sft_baseline(
             "model":          model_name,
             "n_epochs":       n,
             "train_examples": len(train_ds),
+            "validation_examples": len(validation_ds),
             "heldout_examples": len(heldout_ds),
-            "novel_families": list(novel_families),
+            "heldout_evaluated_once_after_training": True,
+            "checkpoint_sha256": sha256_file(PROJECT_ROOT / "checkpoints/sft_run/sft_final.pt"),
             "lr":             lr,
             "batch_size":     batch_size,
+            "seed":           seed,
+            "training_data_sha256": sha256_file(TRAIN_PATH),
+            "validation_data_sha256": sha256_file(VALIDATION_PATH),
+            "heldout_data_sha256": sha256_file(HELDOUT_PATH),
             "note": (
-                "SFT trains on a fixed static dataset. It cannot adapt to novel "
-                "attack templates not present in training. MAPPO co-evolves with "
-                "the attacker and generalizes better to unseen injection patterns."
+                "Held-out data is used once after training; epoch monitoring uses validation data. "
+                "This classifier experiment is distinct from the Qwen language-model smoke test."
             ),
         },
         "aggregate": {
             "final_train_loss":           round(episode_records[-1]["train_loss"], 6),
             "final_train_accuracy":       round(episode_records[-1]["train_accuracy"], 4),
-            "final_heldout_accuracy":     round(episode_records[-1]["heldout_accuracy"], 4),
-            "final_asr":                  round(episode_records[-1]["asr"], 4),
-            "final_novel_attack_accuracy": round(episode_records[-1]["novel_attack_accuracy"], 4),
-            "mean_defender_reward":       round(
-                sum(r["defender_reward"] for r in episode_records) / n, 4
-            ),
+            "final_validation_accuracy": round(episode_records[-1]["validation_accuracy"], 4),
+            "final_heldout": {k: round(v, 4) if isinstance(v, float) else v for k, v in heldout_metrics.items()},
         },
         "asr_vs_step":     asr_vs_step,
         "episode_records": episode_records,
@@ -464,10 +486,12 @@ if __name__ == "__main__":
     parser.add_argument("--lr",         type=float, default=2e-5,  help="Learning rate")
     parser.add_argument("--batch-size", type=int,   default=4,     help="Batch size")
     parser.add_argument("--model",      type=str,   default="distilbert-base-uncased")
+    parser.add_argument("--seed",       type=int,   default=42, help="Random seed for this training run")
     args = parser.parse_args()
     run_sft_baseline(
         epochs=args.epochs,
         lr=args.lr,
         batch_size=args.batch_size,
         model_name=args.model,
+        seed=args.seed,
     )
