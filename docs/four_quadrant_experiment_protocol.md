@@ -27,9 +27,15 @@ does not run tools or certify task completion.
 
 - Create a new train/validation/test split. The checked-in four-quadrant set has
   already been inspected and is exploratory. All 100 checked-in cases use the
-  same `user_task` text, and the 50 benign cases lack `task_family` annotations;
-  therefore Q1/Q3 family separation and benign OOD status cannot be verified
-  from that set.
+  same `user_task` text. Q3 now contains five draft benign task families that
+  are absent from the SFT records, but those labels and prompts were prepared
+  after inspecting the training data. They support pipeline development only;
+  use an independently curated and sealed benchmark for confirmatory claims.
+- Treat the checked-in `task_family` values as draft annotations. Preflight
+  checks whether family strings overlap the designated splits; it cannot decide
+  whether a family label is semantically correct or whether a prompt is truly
+  out of distribution. Have a curator review the task-family taxonomy and
+  document the source and annotation procedure for the final study.
 - Annotate benign cases with `task_family`: Q1 families must appear in SFT
   training, while Q3 families must be absent from SFT training and validation.
   Annotate injection cases with `attack_family`: Q2 families must appear in

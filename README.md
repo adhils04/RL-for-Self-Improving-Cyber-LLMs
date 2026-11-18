@@ -88,7 +88,7 @@ pip install -r requirements.txt
 
 ### 2. Prepare and validate data splits
 
-The dataset-generation script overwrites the training and held-out files and does not create the validation split. Do not run it over the checked-in data. Prepare and freeze separate training, validation, and confirmatory-test files; annotate task and attack families, then run the preflight before training. The checked-in files are exploratory and intentionally fail this check.
+The dataset-generation script overwrites the training and held-out files and does not create the validation split. Do not run it over the checked-in data. Prepare and freeze separate training, validation, and confirmatory-test files; annotate task and attack families, then run the preflight before training. The checked-in files are exploratory. Preflight checks structural and family conditions, but does not certify dataset size, provenance, or test-set blindness; the evaluator rejects the checked-in benchmark for confirmatory use.
 
 ```bash
 python3 scripts/validate_llm_experiment_data.py \

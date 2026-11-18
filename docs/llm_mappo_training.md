@@ -43,9 +43,11 @@ python3 scripts/validate_llm_experiment_data.py \
 ```
 
 Pass the same `--attack-categories` here and to the MAPPO trainer when using a
-non-default attacker action set. The checked-in files intentionally fail this
-confirmatory preflight because they are small, previously inspected, and lack
-the required task-family annotations.
+non-default attacker action set. The checked-in files have draft family labels
+and pass the structural preflight, but remain exploratory: the benchmark has
+been inspected, the validation split has only eight records, and preflight
+cannot verify annotation quality, provenance, or test-set blindness. The
+evaluator rejects the checked-in benchmark when marked confirmatory.
 
 Train SFT on the exact base model planned for MAPPO:
 
