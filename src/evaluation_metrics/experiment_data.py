@@ -118,6 +118,11 @@ def validate_confirmatory_data(train_rows: list[dict], validation_rows: list[dic
             user_task = row.get("user_task")
             if not isinstance(user_task, str) or not user_task.strip():
                 raise ValueError(f"Benchmark case {row.get('id')} needs a non-empty user_task")
+            expected_novelty = quadrant in {"Q3_unique_benign", "Q4_unique_injection"}
+            if row.get("is_novel") is not expected_novelty:
+                raise ValueError(
+                    f"Benchmark case {row.get('id')} has an is_novel/quadrant mismatch"
+                )
             if LABEL_ACTION.get(row.get("label")) != EXPECTED_LABELS[quadrant]:
                 raise ValueError(f"Benchmark case {row.get('id')} has a label/quadrant mismatch")
             if EXPECTED_LABELS[quadrant] == "ALLOW" and not row.get("task_family"):
