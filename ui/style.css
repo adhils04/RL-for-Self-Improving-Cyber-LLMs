@@ -660,10 +660,6 @@ body {
     border: 1px solid var(--danger-border);
 }
 
-.readable-new-label {
-    font-size: 0.8rem;
-}
-
 .model-badge.benign {
     background: #f1f5f9;
     color: #475569;

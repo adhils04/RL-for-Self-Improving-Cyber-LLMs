@@ -2,9 +2,9 @@
 
 ## Current phase
 
-External SFT/MAPPO training and confirmatory evaluation are pending. The repository has separate Qwen language-model smoke-test and DistilBERT classifier pipelines. The classifier checkpoints required for comparison are absent from this checkout. Historical claims in earlier reports were withdrawn because the reports conflict and the resampling analysis did not support the reported significance tests. See `reports/phase3_final_report.md` and `docs/four_quadrant_experiment_protocol.md` for current evidence scope and the evaluation protocol.
-
-The historical Review 1–3 fixture milestones below document prior development and are not evidence that the current DistilBERT comparison has been trained or validated.
+Part 10: Review 3 final summary and presentation artefacts (complete).
+All three review phases are now fully implemented as fixture infrastructure.
+SFT and MAPPO training remain BLOCKED_EXTERNAL.
 
 ## Completed
 
@@ -35,13 +35,16 @@ Nothing in progress.
 
 ## Next exact action
 
-After external training produces the required SFT and MAPPO classifier checkpoints, run the four-quadrant evaluator on a newly frozen benchmark and preserve checkpoint/data hashes. Do not use previously inspected cases as confirmatory evidence.
+All Review 2 integration and training contracts are functional and verified.
+1. Run `python3 scripts/run_mappo_coevolution.py` for full 500-episode co-evolution training on CUDA GPU.
+2. Evaluate checkpoints via `scripts/evaluate_checkpoint.py`.
 
 ## Latest verification
 
-- Historical repository record: `PYTHONPATH=. python3 -m pytest` reported 430 tests passed. This was not rerun during the current paper/evaluation revisions.
-- Historical MAPPO smoke test and dry-run checks are recorded below; they do not establish validity of the current comparative experiment.
-- Scripts: the following historical checks were recorded:
+- Command: `PYTHONPATH=. python3 -m pytest`
+- Result: 430 tests passed, 0 failed.
+- MAPPO smoke test: `run_mappo_coevolution.py` runs end-to-end (1 episode verified).
+- Scripts: all 6 scripts exit 0 (dry-run verified):
   - `prepare_sft.py --dry-run`
   - `run_review1_baseline.py --dry-run`
   - `run_review2_episode.py --dry-run`

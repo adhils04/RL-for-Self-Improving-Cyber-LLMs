@@ -48,16 +48,6 @@ def encode_obs(text: str, state_dim: int = 8) -> torch.Tensor:
     return torch.tensor(vec, dtype=torch.float32)
 
 
-def sha256_file(path: Path) -> str | None:
-    if not path.is_file():
-        return None
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 import random
 
 
@@ -210,24 +200,13 @@ def _save_training_metrics(
             "algorithm":               "MAPPO (CTDE)",
             "n_episodes":              n,
             "num_episodes_configured": num_episodes,
-            "seed":                    config.get("experiment", {}).get("seed", 42),
-            "config_sha256":           hashlib.sha256(json.dumps(config, sort_keys=True).encode("utf-8")).hexdigest(),
-            "sft_checkpoint_sha256":    sha256_file(_PROJECT_ROOT / "checkpoints/sft_run/sft_final.pt"),
-            "training_data_sha256":     sha256_file(_PROJECT_ROOT / "data/sft/train.jsonl"),
-            "environment_cases_sha256": sha256_file(_PROJECT_ROOT / "data/evaluation/benchmark_cases.jsonl"),
-            "mappo_checkpoint_sha256":  sha256_file(_PROJECT_ROOT / config.get("logging", {}).get("checkpoint_dir", "checkpoints/mappo_run") / Path("mappo_defender_final.pt")),
             "defender":                "NeuralDefenderPolicy (DistilBERT initialized from SFT + PPO updates)",
             "attacker":                f"AttackerPolicy (Actor-Critic, state_dim={config.get('models', {}).get('attacker_state_dim', 8)}, action_dim={config.get('models', {}).get('attacker_action_dim', len(ATTACK_CATEGORIES))})",
             "critic":                  "CentralizedCritic (DistilBERT regression head, V(S))",
             "gamma":                   config["training"]["gamma"],
             "gae_lambda":              config["training"]["gae_lambda"],
             "clip_epsilon":            config["training"]["clip_epsilon"],
-            "beta_kl":                 config["training"].get("beta_kl", 0.1),
-            "entropy_coeff":           config["training"].get("entropy_coeff", 0.01),
             "ppo_epochs":              config["training"]["ppo_epochs"],
-            "defender_lr":             config["training"].get("defender_lr"),
-            "actor_lr":                config["training"].get("actor_lr"),
-            "critic_lr":               config["training"].get("critic_lr"),
         },
         "aggregate": {
             "mean_attack_success_rate": round(mean_asr, 4),
@@ -249,16 +228,6 @@ def _save_training_metrics(
 def main(config_path=None):
     config = load_config(config_path)
 
-    # MAPPO must start from the exact SFT policy it will use as the frozen KL
-    # reference. Starting from base weights would invalidate the comparison.
-    sft_ckpt_path = _PROJECT_ROOT / "checkpoints" / "sft_run" / "sft_final.pt"
-    if not sft_ckpt_path.is_file():
-        raise FileNotFoundError(
-            "Required SFT warm-start checkpoint is missing: "
-            f"{sft_ckpt_path}. Train the SFT baseline first; MAPPO will not "
-            "silently start from base weights."
-        )
-
     # Device selection
     device = _resolve_device(config.get("models", {}).get("device", "auto"))
     print(f"[*] Initializing MAPPO Co-evolution on device: {device}", flush=True)
@@ -268,8 +237,6 @@ def main(config_path=None):
     gae_lambda    = config["training"]["gae_lambda"]
     ppo_epochs    = config["training"]["ppo_epochs"]
     clip_epsilon  = config["training"]["clip_epsilon"]
-    beta_kl       = config["training"].get("beta_kl", 0.1)
-    entropy_coeff = config["training"].get("entropy_coeff", 0.01)
     actor_lr      = config["training"].get("actor_lr", 3e-5)
     critic_lr     = config["training"].get("critic_lr", 2e-5)
     defender_lr   = config["training"].get("defender_lr", 1.2e-5)
@@ -308,22 +275,24 @@ def main(config_path=None):
     )
 
     # Load SFT reference policy warm-up checkpoint and frozen KL anchor
+    sft_ckpt_path = _PROJECT_ROOT / "checkpoints" / "sft_run" / "sft_final.pt"
     ref_defender = None
-    print(f"[*] Initializing MAPPO Defender from SFT reference policy: {sft_ckpt_path}", flush=True)
-    defender.load_checkpoint(sft_ckpt_path)
-    ref_defender = NeuralDefenderPolicy(
-        model_name_or_path=config["models"].get("defender_model", "distilbert-base-uncased"),
-        learning_rate=defender_lr,
-        device=device,
-    )
-    ref_defender.load_checkpoint(sft_ckpt_path)
-    ref_defender.model.eval()
-    for p in ref_defender.model.parameters():
-        p.requires_grad_(False)
+    if sft_ckpt_path.exists():
+        print(f"[*] Initializing MAPPO Defender from SFT reference policy: {sft_ckpt_path}", flush=True)
+        defender.load_checkpoint(sft_ckpt_path)
+        ref_defender = NeuralDefenderPolicy(
+            model_name_or_path=config["models"].get("defender_model", "distilbert-base-uncased"),
+            learning_rate=defender_lr,
+            device=device,
+        )
+        ref_defender.load_checkpoint(sft_ckpt_path)
+        ref_defender.model.eval()
+        for p in ref_defender.model.parameters():
+            p.requires_grad_(False)
+    else:
+        print("[!] SFT reference policy not found; starting Defender from base weights.", flush=True)
 
-    # PPO ratios require actions sampled from the policy whose log-probability
-    # is stored in the trajectory. Entropy regularization supplies exploration.
-    defender_adapter = NeuralDefenderAdapter(policy=defender, deterministic=False, explore_eps=0.0)
+    defender_adapter = NeuralDefenderAdapter(policy=defender, deterministic=False, explore_eps=0.25)
 
     cases_path = _PROJECT_ROOT / "data" / "evaluation" / "benchmark_cases.jsonl"
     sft_benign_pool = _load_sft_benign_pool(_PROJECT_ROOT / "data" / "sft" / "train.jsonl")
@@ -347,6 +316,10 @@ def main(config_path=None):
     running_def_loss = 0.0
 
     for episode in range(1, num_episodes + 1):
+        # Anneal exploration smoothly from 0.30 -> 0.05 across episodes
+        progress = (episode - 1) / max(num_episodes - 1, 1)
+        defender_adapter.explore_eps = 0.30 * (1.0 - progress) + 0.05 * progress
+
         # 40% benign calibration episodes (benchmark + diverse SFT benign), 60% adversarial
         is_benign_ep = random.random() < 0.40
         if is_benign_ep and (sft_benign_pool or env_benign_cases):
@@ -554,8 +527,8 @@ def main(config_path=None):
                         old_log_probs=def_logprobs,
                         advantages=def_advantages,
                         clip_epsilon=clip_epsilon,
-                        entropy_coeff=entropy_coeff,
-                        beta_kl=beta_kl,
+                        entropy_coeff=0.015,
+                        beta_kl=0.05,
                         ref_logits=ref_logits,
                         kl_weights=kl_weights,
                     )

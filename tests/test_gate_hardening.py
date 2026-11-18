@@ -1,6 +1,6 @@
 """Review 1 gate and sandbox hardening tests.
 
-Covers the Part 1 gate and sandbox hardening test matrix:
+Covers the full Part 1 test matrix from docs/claude-end-to-end-execution-map.md:
   - allowlisted read-only lookup               (existing, re-confirmed)
   - unknown tool                               (existing, re-confirmed)
   - write/delete/send/export tool              (existing, re-confirmed)

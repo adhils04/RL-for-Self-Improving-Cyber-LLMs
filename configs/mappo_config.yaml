@@ -11,11 +11,9 @@ training:
   gae_lambda: 0.95
   ppo_epochs: 4
   clip_epsilon: 0.2
-  beta_kl: 0.1
-  entropy_coeff: 0.01
   critic_lr: 0.00003           # 3e-5 Critic value convergence
   actor_lr: 0.002              # responsive Attacker MLP exploration across weak categories
-  defender_lr: 0.000018        # 1.8e-5 PPO adaptation on top of the SFT checkpoint
+  defender_lr: 0.000018        # 1.8e-5 PPO adaptation on top of clean SFT checkpoint
   max_grad_norm: 0.5           # standard PPO-with-transformer value
   mini_batch_size: 4
 
