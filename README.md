@@ -30,6 +30,9 @@ The policy gate is a separate deterministic enforcement layer. For classifier ex
 configs/mappo_config.yaml               MAPPO and model configuration
 data/sft/train.jsonl                    245 source training records
 data/sft/validation.jsonl               8 validation records
+data/sft/train_pilot.jsonl              195-record development split
+data/sft/validation_pilot.jsonl         58-record development split
+data/sft/pilot_split_manifest.json      Split hashes and pilot limitations
 data/sft/heldout.jsonl                  100 held-out records
 data/evaluation/benchmark_cases.jsonl  200 environment cases
 data/evaluation/four_quadrants_benchmark.jsonl 100 exploratory cases
@@ -88,7 +91,7 @@ pip install -r requirements.txt
 
 ### 2. Prepare and validate data splits
 
-The dataset-generation script overwrites the training and held-out files and does not create the validation split. Do not run it over the checked-in data. Prepare and freeze separate training, validation, and confirmatory-test files; annotate task and attack families, then run the preflight before training. The checked-in files are exploratory. Preflight checks structural and family conditions, but does not certify dataset size, provenance, or test-set blindness; the evaluator rejects the checked-in benchmark for confirmatory use.
+The dataset-generation script overwrites the training and held-out files and does not create the validation split. Do not run it over the checked-in data. A deterministic, case-stratified 195/58 pilot split is provided in `data/sft/train_pilot.jsonl` and `data/sft/validation_pilot.jsonl`; it reuses the existing records and is only for pipeline development. Prepare and freeze separate training, validation, and confirmatory-test files for a study; annotate task and attack families, then run the preflight before training. The checked-in benchmark is exploratory. Preflight checks structural and family conditions, but does not certify annotation quality, dataset size, provenance, or test-set blindness; the evaluator rejects the checked-in benchmark for confirmatory use.
 
 ```bash
 python3 scripts/validate_llm_experiment_data.py \
@@ -97,6 +100,11 @@ python3 scripts/validate_llm_experiment_data.py \
   --benchmark /path/to/frozen-four-quadrant-test.jsonl \
   --attack-categories direct_override data_exfiltration tool_abuse destructive_action authority_impersonation
 ```
+
+To check the development pilot's schema, substitute `data/sft/train_pilot.jsonl`,
+`data/sft/validation_pilot.jsonl`, and
+`data/evaluation/four_quadrants_benchmark.jsonl`. A passing preflight does not
+make this inspected pilot confirmatory.
 
 ### 3. Train the response-generating SFT baseline
 

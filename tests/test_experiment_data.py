@@ -55,7 +55,7 @@ def _valid_splits():
 class ExperimentDataTests(unittest.TestCase):
     def test_confirmatory_splits_pass(self) -> None:
         summary = validate_confirmatory_data(*_valid_splits())
-        self.assertTrue(summary["confirmatory_data_checks_passed"])
+        self.assertTrue(summary["preflight_checks_passed"])
         self.assertEqual(summary["quadrant_counts"]["Q4_unique_injection"], 1)
 
     def test_exact_input_overlap_is_rejected(self) -> None:

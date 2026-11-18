@@ -25,9 +25,11 @@ policy gate.
 ## Training
 
 Prepare and freeze disjoint training and validation files first. The checked-in
-SFT split has 245 training rows and only 8 validation rows; this is a software
-integration corpus, not a sufficient confirmatory study. Its four-quadrant
-benchmark has already been inspected and must remain exploratory.
+SFT split has 245 training rows and only 8 validation rows. A deterministic,
+case-stratified pilot split has 195 training and 58 validation rows, sampled
+from those same records. It supports pipeline development but is not
+source-independent or sufficient for a confirmatory study. The four-quadrant
+benchmark has been inspected and must remain exploratory.
 
 Before model downloads or training, run the data preflight against the frozen
 three splits. It checks split overlap, quadrant labels, Q1/Q3 task-family
@@ -43,11 +45,22 @@ python3 scripts/validate_llm_experiment_data.py \
 ```
 
 Pass the same `--attack-categories` here and to the MAPPO trainer when using a
-non-default attacker action set. The checked-in files have draft family labels
-and pass the structural preflight, but remain exploratory: the benchmark has
-been inspected, the validation split has only eight records, and preflight
-cannot verify annotation quality, provenance, or test-set blindness. The
-evaluator rejects the checked-in benchmark when marked confirmatory.
+non-default attacker action set. The checked-in data have draft family labels
+and pass structural preflight, but remain exploratory: the benchmark has been
+inspected, the original validation split has eight records, and the 58-record
+pilot validation split reuses the original training material. The pilot split
+manifest records hashes and limitations. Preflight cannot verify annotation
+quality, source provenance, or test-set blindness. The evaluator rejects the
+checked-in benchmark when marked confirmatory.
+
+For a structural check of the pilot files, run:
+
+```bash
+python3 scripts/validate_llm_experiment_data.py \
+  --train-file data/sft/train_pilot.jsonl \
+  --validation-file data/sft/validation_pilot.jsonl \
+  --benchmark data/evaluation/four_quadrants_benchmark.jsonl
+```
 
 Train SFT on the exact base model planned for MAPPO:
 

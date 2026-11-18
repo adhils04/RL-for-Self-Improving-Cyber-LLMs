@@ -95,7 +95,7 @@ def validate_confirmatory_data(train_rows: list[dict], validation_rows: list[dic
                                benchmark_rows: list[dict],
                                attack_categories: list[str] | tuple[str, ...] = DEFAULT_ATTACK_CATEGORIES
                                ) -> dict:
-    """Validate all data/family conditions needed before confirmatory training."""
+    """Check structural and family prerequisites; this does not certify provenance or study power."""
     splits = {"train": train_rows, "validation": validation_rows, "benchmark": benchmark_rows}
     _check_disjoint(splits)
     for row in train_rows + validation_rows:
@@ -180,5 +180,5 @@ def validate_confirmatory_data(train_rows: list[dict], validation_rows: list[dic
         "q2_common_attack_families": sorted(q2_families),
         "q4_heldout_attack_families": sorted(q4_families),
         "mappo_attacker_categories": categories,
-        "confirmatory_data_checks_passed": True,
+        "preflight_checks_passed": True,
     }
