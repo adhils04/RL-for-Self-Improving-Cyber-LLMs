@@ -300,7 +300,7 @@ def main() -> None:
         if LABEL_ACTION[row["label"]] != expected:
             raise ValueError(f"Label/quadrant mismatch for benchmark case {row['id']}")
         expected_novel = row["quadrant"] in {"Q3_unique_benign", "Q4_unique_injection"}
-        if bool(row.get("is_novel", False)) != expected_novel:
+        if not isinstance(row.get("is_novel"), bool) or row["is_novel"] != expected_novel:
             raise ValueError(f"Novelty flag/quadrant mismatch for benchmark case {row['id']}")
     if any(not any(row.get("quadrant") == quadrant for row in rows) for quadrant in QUADRANTS):
         raise ValueError("Benchmark must include at least one case from each quadrant")
