@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MAPPO vs. SFT — System Architecture & Game Formulation</title>
-    <meta name="description" content="System architecture and CTDE multi-agent game formulation proving that MAPPO outperforms SFT for prompt injection defense.">
+    <meta name="description" content="Research prototype architecture for comparing SFT and MAPPO prompt-injection classifiers.">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -198,7 +198,7 @@
         }
 
         .comp-badge {
-            font-size: 0.68rem;
+            font-size: 0.75rem;
             font-weight: 600;
             padding: 2px 7px;
             border-radius: 4px;
@@ -392,27 +392,8 @@
 
 <!-- Empirical Benchmark Banner -->
 <div class="empirical-banner">
-    <div class="banner-title">
-        Empirical Validation (Heldout Benchmark, B=30 Bootstrap Folds)
-    </div>
-    <div class="banner-stats">
-        <div class="banner-stat-item">
-            <span class="stat-k">Novel Attack Defense</span>
-            <span class="stat-v sig">MAPPO 97.6% vs SFT 87.2%</span>
-        </div>
-        <div class="banner-stat-item">
-            <span class="stat-k">Novel Attack ASR</span>
-            <span class="stat-v sig">MAPPO 2.4% vs SFT 12.8%</span>
-        </div>
-        <div class="banner-stat-item">
-            <span class="stat-k">Welch's t-test</span>
-            <span class="stat-v sig">t = +10.30 (p &lt; 10⁻⁶)</span>
-        </div>
-        <div class="banner-stat-item">
-            <span class="stat-k">Effect Size</span>
-            <span class="stat-v sig">Cohen's d = +2.66</span>
-        </div>
-    </div>
+    <div class="banner-title">Comparative results pending</div>
+    <p>Required classifier checkpoints are not present in this checkout. A new frozen test set and external training run are required before reporting comparative results.</p>
 </div>
 
 <!-- Comparison Matrix -->
@@ -423,13 +404,13 @@
             <div class="comp-title">
                 Multi-Agent PPO (CTDE)
             </div>
-            <span class="comp-badge win">PROVEN DEFENSE</span>
+            <span class="comp-badge win">TRAINING PIPELINE</span>
         </div>
         <ul class="comp-list">
-            <li><strong>Dynamic Co-evolution:</strong> Attacker continually probes vulnerabilities, forcing the Defender to generalize against zero-day payloads.</li>
-            <li><strong>Centralized Critic V_phi(S):</strong> Observes global environment state (attacker intent + task + environment state) to provide low-variance Generalized Advantage Estimation (GAE).</li>
-            <li><strong>PPO Clipped Objective with KL Penalty:</strong> Regularizes updates around pi_SFT to preserve benign task utility while maximizing injection resistance.</li>
-            <li><strong>Decentralized Execution:</strong> At test/inference time, the Defender operates strictly on its local observation, with zero runtime critic overhead.</li>
+            <li><strong>Configured Attack Categories:</strong> The attacker selects from a fixed category set using an eight-dimensional hash encoding of the task identifier.</li>
+            <li><strong>Centralized Critic V_phi(S):</strong> A DistilBERT regression model scores text representations of the environment state during training.</li>
+            <li><strong>PPO Clipped Objective with KL Penalty:</strong> Updates the binary classifier relative to the frozen SFT reference policy.</li>
+            <li><strong>Evaluation status:</strong> Trained comparison checkpoints are absent; performance has not been confirmed.</li>
         </ul>
     </div>
 
@@ -443,9 +424,9 @@
         </div>
         <ul class="comp-list">
             <li><strong>Passive Offline Dataset:</strong> Trained solely via Cross-Entropy on fixed prompt-completion pairs.</li>
-            <li><strong>Zero Active Exploration:</strong> Cannot anticipate unseen adversarial distributions, novel encodings, or recursive obfuscation.</li>
-            <li><strong>OOD Vulnerability:</strong> Fails on 12.8% of novel/out-of-distribution attack variants in empirical testing (ASR = 12.78%).</li>
-            <li><strong>Overfitting Trap:</strong> Achieves 100% on in-distribution templates but exhibits brittle boundary collapse under distribution shift.</li>
+            <li><strong>Training objective:</strong> Cross-entropy updates a binary allow/defend classifier from labeled examples.</li>
+            <li><strong>Evaluation status:</strong> Comparative results are pending a new confirmatory evaluation.</li>
+            <li><strong>Scope:</strong> This is a binary classifier baseline; no current result establishes its behavior on unseen attacks.</li>
         </ul>
     </div>
 </div>
@@ -497,10 +478,9 @@
                 <div class="block-tag">Agent A</div>
                 <div class="label attacker-text">Attacker Policy</div>
                 <div class="sublabel">
-                    MLP Policy (8 → 64 → 5)<br>
-                    Explores attack spaces:<br>
-                    Override · Exfil · Tool Abuse<br>
-                    Destructive · Impersonation
+                    MLP policy (8 → 64 → 10)<br>
+                    Input: task-identifier hash<br>
+                    Output: configured attack category
                 </div>
             </div>
 

@@ -1,10 +1,18 @@
 # Changelog
 
+## 2026-11-18
+
+- Reframed the phase 3 report as a preliminary implementation and evidence audit; removed unsupported comparative performance and significance claims.
+- Documented a four-quadrant confirmatory protocol with a new sealed test set, per-case reporting, fixed decision criteria, multiple training seeds, and explicit checkpoint/data provenance.
+- Updated the classifier trainers and evaluators to separate validation from held-out evaluation, reject cross-split ID/scenario/exact-input duplicates, require trained checkpoints, record run provenance, and avoid treating resamples as independent training runs.
+- Rewrote Sections 3 and 4 to describe the repository’s DistilBERT classifier pipelines and distinguish them from the separate Qwen smoke test.
+- Marked prior significance and four-quadrant outputs as unverified exploratory artifacts; removed unsupported benchmark claims from the demo interfaces.
+
 ## 2026-08-26 - Initial Defender Review 1 foundation
 
 - Added strict tool policy gate, isolated fixture tools, inert sandbox, and audit logging.
 - Added SFT starter corpus, training configuration, baseline evaluator, and reports.
-- Added architecture, master plan, Claude execution map, and persistent project-state workflow.
+- Added architecture, master plan, and persistent project-state workflow.
 - Verified 10 Defender tests pass.
 
 ## 2026-08-26 - Part 1 gate and sandbox hardening
