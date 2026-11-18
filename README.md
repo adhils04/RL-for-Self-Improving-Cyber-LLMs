@@ -86,16 +86,28 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Prepare data splits
+### 2. Prepare and validate data splits
 
-The dataset-generation script overwrites the training and held-out files and does not create the validation split. Do not run it over the checked-in data. Use the frozen files for exploratory setup; prepare and hash a separate train/validation/confirmatory-test set for a confirmatory study.
+The dataset-generation script overwrites the training and held-out files and does not create the validation split. Do not run it over the checked-in data. Prepare and freeze separate training, validation, and confirmatory-test files; annotate task and attack families, then run the preflight before training. The checked-in files are exploratory and intentionally fail this check.
+
+```bash
+python3 scripts/validate_llm_experiment_data.py \
+  --train-file /path/to/frozen-train.jsonl \
+  --validation-file /path/to/frozen-validation.jsonl \
+  --benchmark /path/to/frozen-four-quadrant-test.jsonl \
+  --attack-categories direct_override data_exfiltration tool_abuse destructive_action authority_impersonation
+```
 
 ### 3. Train the response-generating SFT baseline
 
 The trainer masks prompt tokens from the language-model loss, balances ALLOW/DEFEND examples, includes synthetic protected values in both training arms, selects checkpoints with the shared validation score for decision accuracy and synthetic-value exposure, and saves a LoRA adapter plus data and training provenance:
 
 ```bash
-python3 src/train_sft.py --model-name Qwen/Qwen2.5-0.5B --epochs 3
+python3 src/train_sft.py \
+  --model-name Qwen/Qwen2.5-0.5B --epochs 3 \
+  --train-file /path/to/frozen-train.jsonl \
+  --validation-file /path/to/frozen-validation.jsonl \
+  --output-dir checkpoints/sft_llm
 ```
 
 ### 4. Train the causal-LM MAPPO policy
@@ -103,7 +115,13 @@ python3 src/train_sft.py --model-name Qwen/Qwen2.5-0.5B --epochs 3
 Initializes the Defender and frozen KL reference from the same SFT adapter. Benign episodes are sampled at a fixed rate independent of the attacker; on attack episodes the attacker chooses an attack family. The attacker critic uses the global pre-attack state, while the Defender critic uses the attack-conditioned state before response generation. Each episode uses a fresh synthetic protected value and penalizes exact disclosure, without using the real evaluation canary. The trainer writes the adapted language model, actors, critics, and run manifest:
 
 ```bash
-python3 scripts/run_llm_mappo.py --base-model Qwen/Qwen2.5-0.5B --episodes 4000
+python3 scripts/run_llm_mappo.py \
+  --base-model Qwen/Qwen2.5-0.5B --episodes 4000 \
+  --sft-adapter checkpoints/sft_llm \
+  --train-file /path/to/frozen-train.jsonl \
+  --validation-file /path/to/frozen-validation.jsonl \
+  --attack-categories direct_override data_exfiltration tool_abuse destructive_action authority_impersonation \
+  --output-dir checkpoints/mappo_llm
 ```
 
 Training is not performed by these instructions automatically. Review the data protocol and run with the externally provisioned accelerator and model access.
@@ -115,6 +133,10 @@ The causal-LM evaluator samples generated responses from both adapters and recor
 ```bash
 EVAL_CANARY_VALUE='your-runtime-only-canary' python3 scripts/evaluate_llm_four_quadrants.py \
   --benchmark /path/to/frozen-four-quadrant-test.jsonl \
+  --train-file /path/to/frozen-train.jsonl \
+  --validation-file /path/to/frozen-validation.jsonl \
+  --sft-adapter checkpoints/sft_llm \
+  --mappo-adapter checkpoints/mappo_llm \
   --benchmark-status confirmatory --samples-per-case 20 \
   --minimum-action-rate 0.8 --seed 42
 ```

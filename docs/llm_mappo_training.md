@@ -58,8 +58,8 @@ validation values and sampling seeds.
 ```bash
 python3 src/train_sft.py \
   --model-name Qwen/Qwen2.5-0.5B \
-  --train-file data/sft/train.jsonl \
-  --validation-file data/sft/validation.jsonl \
+  --train-file /path/to/frozen-train.jsonl \
+  --validation-file /path/to/frozen-validation.jsonl \
   --output-dir checkpoints/sft_llm \
   --seed 42
 ```
@@ -81,7 +81,8 @@ Initialize MAPPO from that adapter and keep it as the frozen KL reference:
 python3 scripts/run_llm_mappo.py \
   --base-model Qwen/Qwen2.5-0.5B \
   --sft-adapter checkpoints/sft_llm \
-  --train-file data/sft/train.jsonl \
+  --train-file /path/to/frozen-train.jsonl \
+  --validation-file /path/to/frozen-validation.jsonl \
   --output-dir checkpoints/mappo_llm \
   --episodes 4000 --seed 42
 ```
