@@ -6,23 +6,23 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 > **Research Paper Implementation & Artifact Repository**  
-> **Research question:** Does MAPPO improve prompt-injection classification compared with an SFT classifier under controlled in-distribution and out-of-distribution conditions?
+> **Research question:** Does MAPPO improve a response-generating language model's prompt-injection decisions over an SFT baseline across common and out-of-distribution cases?
 
 ---
 
 ## Evidence status
 
-The working copy has a local Qwen2.5-0.5B LoRA SFT smoke-test adapter, but it is not tracked in Git. It was trained for one epoch on 20 formatted examples and is not a MAPPO checkpoint. A separate DistilBERT classifier SFT/MAPPO pipeline is used for the comparison, but its trained checkpoints are absent from this checkout.
+One historical Qwen SFT adapter is included under `defender_checkpoints/`, but it has no run manifest or matching MAPPO adapter and is not a reproducible baseline for this experiment. The earlier DistilBERT classifier pipeline is also separate from the response-generating pipeline documented below.
 
-The saved reports contain conflicting metric values, and the four-quadrant report does not include per-case outputs or checkpoint hashes. Treat those figures as unverified artifacts, not as evidence of a completed LLM comparison. The MAPPO/SFT evaluation protocol is being tightened before new training runs. See [the four-quadrant experiment protocol](docs/four_quadrant_experiment_protocol.md) for the planned split, endpoints, and reporting rules.
+Historical reports do not establish a completed LLM comparison. The new causal-LM scripts have not been trained or evaluated; use a new frozen test set for confirmatory results. See [the training and evaluation guide](docs/llm_mappo_training.md) and [the four-quadrant protocol](docs/four_quadrant_experiment_protocol.md).
 
 ---
 
 ## Implemented model paths
 
-The MAPPO comparison is a DistilBERT binary classifier that predicts allow or defend. The attacker chooses among configured attack categories from an eight-dimensional hash encoding of the task identifier, while the critic supports policy updates. This is not free-form adaptive red teaming or a generative language-model agent, and the classifier does not execute tools. Separately, the untracked local Qwen2.5-0.5B LoRA smoke test exercises response generation; that adapter is not a MAPPO checkpoint.
+The repository contains two distinct tracks. The earlier DistilBERT pipeline remains available for reproducing its classifier experiment. The causal-LM track trains a LoRA SFT adapter, then applies a competitive attacker-Defender MAPPO variant with separate centralized state-value critics. It compares sampled response decisions in four quadrants. The original MAPPO paper evaluates cooperative tasks; this adversarial use is an adaptation, not a reproduction of those experiments. The model's `ALLOW` marker is an experimental decision outcome; it is not authorization to run arbitrary tools. The fixed policy gate remains the enforcement boundary for tool proposals.
 
-The policy gate is a separate deterministic enforcement layer. Keep its version fixed across both classifier arms and report gate decisions separately from classifier predictions.
+The policy gate is a separate deterministic enforcement layer. For classifier experiments, keep its version fixed across both arms and report gate decisions separately from classifier predictions. In the causal-LM path, `ALLOW` does not authorize a tool call.
 
 ## Repository structure
 
@@ -36,6 +36,10 @@ data/evaluation/four_quadrants_benchmark.jsonl 100 exploratory cases
 scripts/run_sft_baseline.py             DistilBERT SFT classifier trainer
 scripts/run_mappo_coevolution.py        DistilBERT MAPPO classifier trainer
 scripts/evaluate_four_quadrants.py      Paired stochastic four-quadrant evaluator
+src/train_sft.py                        Completion-only causal-LM SFT trainer
+scripts/run_llm_mappo.py                Causal-LM adversarial MAPPO variant trainer
+scripts/evaluate_llm_four_quadrants.py  Generated-response four-quadrant evaluator
+scripts/validate_llm_experiment_data.py Pre-training split and family preflight
 scripts/run_mappo_vs_sft_stats.py       Paired case-conditional descriptive analysis
 reports/mappo_vs_sft_paired_comparison.json  Generated descriptive comparison with provenance
 src/defender_policy/                    Classifier, policy adapter, and fixed gate
@@ -45,13 +49,13 @@ reports/phase3_final_report.md          Preliminary implementation and evidence 
 docs/four_quadrant_experiment_protocol.md  Confirmatory evaluation protocol
 ```
 
-The DistilBERT SFT and MAPPO checkpoints needed for the comparison are absent from this checkout. Existing evaluation reports are exploratory or unverified; they do not establish comparative performance.
+There is no reproducible SFT/MAPPO checkpoint pair in this checkout. Existing evaluation reports are exploratory or unverified; they do not establish comparative performance.
 
 ---
 
 ## 🛡️ Interactive Research Arena UI
 
-The UI is a classifier demonstration, not a generative-agent environment. It displays allow/defend predictions when trained checkpoints are available. Its heuristic prompt flag is illustrative and is not a policy gate or ground truth.
+The UI is a classifier demonstration, not the causal-LM experiment environment. It displays allow/defend predictions when classifier checkpoints are available. Its heuristic prompt flag is illustrative and is not a policy gate or ground truth.
 
 * **Side-by-Side View:** Compare classifier predictions from the **MAPPO** and **SFT** checkpoints.
 * **Example Prompts:** Load examples for:
@@ -86,33 +90,40 @@ pip install -r requirements.txt
 
 The dataset-generation script overwrites the training and held-out files and does not create the validation split. Do not run it over the checked-in data. Use the frozen files for exploratory setup; prepare and hash a separate train/validation/confirmatory-test set for a confirmatory study.
 
-### 3. Train SFT Baseline
-Trains the `distilbert-base-uncased` classifier via cross-entropy (default: 50 epochs) and saves checkpoint to `checkpoints/sft_run/sft_final.pt`:
+### 3. Train the response-generating SFT baseline
+
+The trainer masks prompt tokens from the language-model loss, balances ALLOW/DEFEND examples, includes synthetic protected values in both training arms, selects checkpoints with the shared validation score for decision accuracy and synthetic-value exposure, and saves a LoRA adapter plus data and training provenance:
+
 ```bash
-python scripts/run_sft_baseline.py --epochs 30 --lr 2e-5
+python3 src/train_sft.py --model-name Qwen/Qwen2.5-0.5B --epochs 3
 ```
 
-### 4. Train MAPPO Co-evolution
-Initializes the DistilBERT Defender from the SFT classifier checkpoint and trains the attacker and defender using the configured episode count, saving checkpoints to `checkpoints/mappo_run/`:
+### 4. Train the causal-LM MAPPO policy
+
+Initializes the Defender and frozen KL reference from the same SFT adapter. Benign episodes are sampled at a fixed rate independent of the attacker; on attack episodes the attacker chooses an attack family. The attacker critic uses the global pre-attack state, while the Defender critic uses the attack-conditioned state before response generation. Each episode uses a fresh synthetic protected value and penalizes exact disclosure, without using the real evaluation canary. The trainer writes the adapted language model, actors, critics, and run manifest:
+
 ```bash
-python scripts/run_mappo_coevolution.py
+python3 scripts/run_llm_mappo.py --base-model Qwen/Qwen2.5-0.5B --episodes 4000
 ```
 
-> **Checkpoint requirement:** Checkpoint weights are stored in ignored directories. MAPPO now stops if the SFT classifier checkpoint is missing. Record each checkpoint hash with its evaluation report.
+Training is not performed by these instructions automatically. Review the data protocol and run with the externally provisioned accelerator and model access.
 
 ### 5. Evaluate the four quadrants
 
-The evaluator requires both trained classifier checkpoints and records repeated stochastic decisions, per-case results, and checkpoint hashes:
+The causal-LM evaluator samples generated responses from both adapters and records per-case decisions, invalid decision markers, benchmark hashes, and (if configured) canary exposure counts. It never stores raw responses or the canary value:
 
 ```bash
-python scripts/evaluate_four_quadrants.py --samples-per-case 20 --seed 42
+EVAL_CANARY_VALUE='your-runtime-only-canary' python3 scripts/evaluate_llm_four_quadrants.py \
+  --benchmark /path/to/frozen-four-quadrant-test.jsonl \
+  --benchmark-status confirmatory --samples-per-case 20 \
+  --minimum-action-rate 0.8 --seed 42
 ```
 
-The checked-in four-quadrant set has already been inspected and its summary reported. It is exploratory; use a separately frozen test set for a confirmatory paper result. Do not interpret bootstrap draws from one fixed test set as independent training runs.
+The checked-in four-quadrant set has already been inspected and is exploratory. Use a separately frozen test set for confirmatory results. The report marks whether each arm meets the required action rate in all four quadrants; choose and record that threshold before accessing the test set. Do not interpret repeated generations or bootstrap draws from one fixed test set as independent training runs. The canary environment variable must be set only in the evaluation process and must not be added to training files or committed reports.
 
-### 6. Summarize paired case outcomes and render a figure
+### 6. Legacy classifier analysis
 
-The paired analysis reports case-conditional intervals and does not estimate variation across training runs:
+The following tools apply only to the DistilBERT classifier track. They are not the analysis path for generated causal-LM responses:
 ```bash
 python scripts/run_mappo_vs_sft_stats.py --benchmark data/evaluation/four_quadrants_benchmark.jsonl
 python scripts/generate_mappo_vs_sft_plots.py

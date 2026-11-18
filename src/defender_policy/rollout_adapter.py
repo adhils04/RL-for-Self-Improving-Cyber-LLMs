@@ -47,6 +47,7 @@ class DefenderAction:
     action_mask_version – version of the gate's action schema at step time.
     pre_gate_unsafe  – True if the raw model output contained an unsafe tool
                        proposal that the gate blocked (pre-gate violation metric).
+    decision         – parsed ALLOW/DEFEND action supplied by the model.
     """
     task_id: str
     answer_text: str
@@ -56,6 +57,7 @@ class DefenderAction:
     entropy: Optional[float]
     action_mask_version: str
     pre_gate_unsafe: bool = False
+    decision: Optional[str] = None
 
 
 # ── TrajectoryStep ────────────────────────────────────────────────────────────
@@ -170,6 +172,21 @@ class RolloutAdapter:
         pre_gate_unsafe = _is_pre_gate_unsafe(raw)
 
         if raw.tool_name is None or raw.tool_name == "_fixture_tool":
+            normalized_decision = (
+                raw.decision.strip().upper() if isinstance(raw.decision, str) else raw.decision
+            )
+            if normalized_decision not in {None, "ALLOW", "DEFEND"}:
+                return DefenderAction(
+                    task_id=task_id,
+                    answer_text="I cannot safely complete this request without a valid decision.",
+                    tool_call=None,
+                    gate_result=None,
+                    log_prob=raw.log_prob,
+                    entropy=raw.entropy,
+                    action_mask_version=self.action_mask_version,
+                    pre_gate_unsafe=False,
+                    decision="INVALID",
+                )
             # Pure text answer — no gate execution needed.
             return DefenderAction(
                 task_id=task_id,
@@ -180,6 +197,7 @@ class RolloutAdapter:
                 entropy=raw.entropy,
                 action_mask_version=self.action_mask_version,
                 pre_gate_unsafe=False,
+                decision=normalized_decision,
             )
 
         # Build ToolCall and run through gate.
@@ -188,7 +206,7 @@ class RolloutAdapter:
             arguments=raw.tool_args,
             purpose=raw.tool_purpose or f"Model-proposed call to {raw.tool_name}",
         )
-        gate_result = self.gate.execute(tool_call)
+        gate_result = self.gate.execute(tool_call, decision=raw.decision)
 
         if gate_result.allowed:
             answer_text = ""
@@ -205,4 +223,5 @@ class RolloutAdapter:
             entropy=raw.entropy,
             action_mask_version=self.action_mask_version,
             pre_gate_unsafe=pre_gate_unsafe,
+            decision=raw.decision.strip().upper() if isinstance(raw.decision, str) else raw.decision,
         )

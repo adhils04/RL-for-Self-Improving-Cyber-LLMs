@@ -9,7 +9,7 @@ class CentralizedCritic(nn.Module):
     The 'God's Eye' Value Network for MAPPO. 
     Observes the global state S and predicts a scalar Value V(S) to guide the actors.
     """
-    def __init__(self, model_name_or_path, device="cuda", lr: float = 1e-5):
+    def __init__(self, model_name_or_path, device="cuda", lr: float = 1e-5, revision=None):
         super(CentralizedCritic, self).__init__()
         if device == "auto":
             if torch.cuda.is_available():
@@ -21,7 +21,9 @@ class CentralizedCritic(nn.Module):
         else:
             self.device = device
 
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_name_or_path, use_fast=False, revision=revision
+        )
         # Ensure padding token exists for batch processing
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -29,10 +31,12 @@ class CentralizedCritic(nn.Module):
         # num_labels=1 converts the transformer into a regression model outputting a scalar
         self.model = AutoModelForSequenceClassification.from_pretrained(
             model_name_or_path,
+            revision=revision,
             num_labels=1,
-            dtype=torch.float32,
+            torch_dtype=torch.float32,
             attn_implementation="eager",
         ).to(self.device)
+        self.base_revision = self.model.config._commit_hash or revision
 
         # Bug fix #10: lr is now config-driven (default kept for backward compat)
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr)

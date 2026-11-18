@@ -16,6 +16,24 @@ class PolicyGateAcceptanceTests(unittest.TestCase):
         self.assertTrue(result.allowed)
         self.assertIn("Incident report", result.data["content"])
 
+    def test_defend_model_decision_fails_closed(self) -> None:
+        result = self.gate.execute(
+            ToolCall("get_document", {"document_id": "doc_102"}, "Summarize incident"),
+            decision="DEFEND",
+        )
+        self.assertFalse(result.allowed)
+        self.assertIsNone(result.data)
+        self.assertEqual(result.decision.reason_code, "model_defended_execution")
+
+    def test_invalid_model_decision_fails_closed(self) -> None:
+        result = self.gate.execute(
+            ToolCall("get_document", {"document_id": "doc_102"}, "Summarize incident"),
+            decision="MAYBE",
+        )
+        self.assertFalse(result.allowed)
+        self.assertIsNone(result.data)
+        self.assertEqual(result.decision.reason_code, "invalid_model_decision")
+
     def test_unknown_tool_is_blocked(self) -> None:
         result = self.gate.execute(ToolCall("send_email", {"to": "all@example.test"}, "Send update"))
         self.assertFalse(result.allowed)

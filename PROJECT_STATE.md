@@ -2,7 +2,9 @@
 
 ## Current phase
 
-External SFT/MAPPO training and confirmatory evaluation are pending. The repository has separate Qwen language-model smoke-test and DistilBERT classifier pipelines. The classifier checkpoints required for comparison are absent from this checkout. Historical claims in earlier reports were withdrawn because the reports conflict and the resampling analysis did not support the reported significance tests. See `reports/phase3_final_report.md` and `docs/four_quadrant_experiment_protocol.md` for current evidence scope and the evaluation protocol.
+External SFT/MAPPO training and confirmatory evaluation are pending. The repository has a completion-only causal-LM SFT trainer with class-balanced decision sampling, a competitive attacker-Defender MAPPO variant initialized from that adapter, and a generated-response four-quadrant evaluator. The variant uses separate centralized state-value critics for the pre-attack state and attack-conditioned Defender state. It receives a direct reward penalty for exposing fresh synthetic protected values; the real evaluation canary is reserved for testing. A historical Qwen SFT adapter is present, but it has no run manifest or matching MAPPO adapter and is not a reproducible comparison checkpoint. The DistilBERT classifier experiment is a separate track. Historical comparative claims were withdrawn because the reports conflict and the resampling analysis did not support the reported significance tests. See `docs/llm_mappo_training.md` and `docs/four_quadrant_experiment_protocol.md` for the current training and evaluation procedures.
+
+The checked-in LLM data is exploratory. It contains 245 training records, 8 validation records, and 100 previously inspected benchmark cases. All benchmark cases use the same `user_task` text; none of the 50 benign cases has a `task_family` annotation. This cannot establish benign out-of-distribution generalization, and the tiny validation split is unsuitable for reliable checkpoint selection. Prepare and freeze new source-separated data before confirmatory training.
 
 The historical Review 1–3 fixture milestones below document prior development and are not evidence that the current DistilBERT comparison has been trained or validated.
 
@@ -35,11 +37,14 @@ Nothing in progress.
 
 ## Next exact action
 
-After external training produces the required SFT and MAPPO classifier checkpoints, run the four-quadrant evaluator on a newly frozen benchmark and preserve checkpoint/data hashes. Do not use previously inspected cases as confirmatory evidence.
+Prepare larger, source-separated training and validation sets plus a new frozen four-quadrant test set. Run `scripts/validate_llm_experiment_data.py` before training; then run the causal-LM SFT and MAPPO scripts on the externally provisioned accelerator, preserve each seed's manifests and checkpoints, and evaluate without exposing the real canary outside the runtime evaluation process. Do not use previously inspected cases as confirmatory evidence.
 
 ## Latest verification
 
-- Historical repository record: `PYTHONPATH=. python3 -m pytest` reported 430 tests passed. This was not rerun during the current paper/evaluation revisions.
+- Earlier check, before the synthetic-canary reward change: 359 `unittest` cases passed, including the decision-to-gate fail-closed path. Two pytest-dependent modules were skipped because `pytest` is unavailable in this environment; the full pytest suite was not run.
+- Current checks: full `unittest` discovery ran 379 entries: 377 passed and two pytest-dependent modules errored at import because `pytest` is not installed. The focused data-preflight, four-quadrant hypothesis, training-context, and policy-gate suites pass (7, 5, 6, and 9 tests). Nineteen changed Python files parse; a synthetic two-seed aggregation check passed; `git diff --check` is clean. The checked-in data correctly fails confirmatory preflight because benign task-family annotations are absent; it remains exploratory.
+- Model training and generation were not run because `peft` is unavailable here. The historical adapter under `defender_checkpoints/` is not a reproducible SFT/MAPPO pair.
+- Historical repository record: `PYTHONPATH=. python3 -m pytest` reported 430 tests passed before the current paper/evaluation revisions.
 - Historical MAPPO smoke test and dry-run checks are recorded below; they do not establish validity of the current comparative experiment.
 - Scripts: the following historical checks were recorded:
   - `prepare_sft.py --dry-run`
@@ -49,12 +54,14 @@ After external training produces the required SFT and MAPPO classifier checkpoin
   - `run_capability_retention_analysis.py --dry-run`
   - `evaluate_checkpoint.py --checkpoint fixture_baseline --allow-heldout` (full run)
 
-## Decisions locked
+## Legacy classifier-track decisions
+
+The decisions and blockers below refer to the earlier Review 1–3 / DistilBERT work. They do not describe the current causal-LM experiment.
 
 - Base model: PENDING. SFT training BLOCKED_EXTERNAL.
 - Dataset version: `review1-fixture-v2` / `sft-v2`.
 - Heldout splits FROZEN — `allow_heldout=True` required.
-- Gate: GATE-001–009; fixed. Cannot be disabled for ablations.
+- Gate: GATE-001–009 remain fixed; GATE-010 fails closed on invalid/DEFEND model decisions. The gate cannot be disabled for ablations.
 - Action schema version: `gate-v1`.
 - Reward weights: lambda_violation=1.0, lambda_refusal=0.3, lambda_cost=0.0.
 - MAPPO defaults: clip_epsilon=0.2, beta_kl=0.1, value_loss_coeff=0.5, entropy_coeff=0.01, gamma=0.99, gae_lambda=0.95.
