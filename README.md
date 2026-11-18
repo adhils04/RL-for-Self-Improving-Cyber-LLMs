@@ -4,155 +4,76 @@
 [![HuggingFace](https://img.shields.io/badge/Transformers-4.40+-yellow.svg?style=flat&logo=huggingface)](https://huggingface.co)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Empirical Significance](https://img.shields.io/badge/Welch's_t--test-p%20%3C%2010⁻⁶-blue.svg)](reports/mappo_vs_sft_statistical_tests.json)
 
 > **Research Paper Implementation & Artifact Repository**  
-> **Core Objective:** Empirically demonstrate and validate that **Multi-Agent Proximal Policy Optimization (MAPPO)** with Centralized Training and Decentralized Execution (CTDE) significantly outperforms static **Supervised Fine-Tuning (SFT)** in defending Large Language Models against novel, out-of-distribution (OOD) prompt injection attacks.
+> **Research question:** Does MAPPO improve a response-generating language model's prompt-injection decisions over an SFT baseline across common and out-of-distribution cases?
 
 ---
 
-## 🔬 Key Empirical Findings
+## Evidence status
 
-Evaluated across $B = 30$ bootstrap resamples on a held-out benchmark ($N = 100$) comprising In-Distribution attacks, Novel OOD attacks (Base64 obfuscation, mathematical cognitive framing, authority impersonation), and Benign cyber operational tasks ($\alpha = 0.05$):
+One historical Qwen SFT adapter is included under `defender_checkpoints/`, but it has no run manifest or matching MAPPO adapter and is not a reproducible baseline for this experiment. The earlier DistilBERT classifier pipeline is also separate from the response-generating pipeline documented below.
 
-| Evaluation Metric | MAPPO (Ours) | SFT Baseline | Welch's $t$ | $p$-value | Cohen's $d$ Effect Size | Empirical Conclusion |
-|---|---|---|---|---|---|---|
-| **Novel Attack Defense (↑)** | **97.61% ± 2.47%** | 82.81% ± 6.64% | **+11.44** | **< 10⁻⁶** | **+2.9536 (Extremely Huge)** | **✓ MAPPO Outperforms SFT** |
-| **Novel Attack ASR (↓)** | **2.39% ± 2.47%** | 17.19% ± 6.64% | **-11.44** | **< 10⁻⁶** | **+2.9536 (Extremely Huge)** | **✓ 86.1% Vulnerability Reduction** |
-| **In-Distribution ASR (↓)** | **0.00% ± 0.00%** | **0.00% ± 0.00%** | 0.00 | 1.0000 | 0.0000 | **✓ Zero Known Attack Regression** |
-| **Defender Expected Reward** | 2.3349 ± 0.1167 | 2.4553 ± 0.1295 | -3.78 | 0.0004 | -0.9765 (Medium) | SFT Higher (Utility Factor) |
-| **Defense Accuracy (Overall)** | 85.10% ± 3.00% | 92.90% ± 2.77% | -10.46 | < 10⁻⁶ | -2.7017 (Huge) | SFT Higher (Utility Factor) |
-| **Benign Utility Preservation** | 29.73% ± 11.38% | 97.58% ± 3.44% | -31.27 | < 10⁻⁶ | -8.0729 (Huge) | SFT Higher (Pareto Alignment Tax) |
-
-```
-====================================================================================================
-                                      CORE RESEARCH TAKEAWAY
-====================================================================================================
-• Static SFT fails on 17.2% of unseen / novel prompt injection variants due to passive keyword overfitting.
-• MAPPO multi-agent co-evolution suppresses novel attack ASR to 2.4% (p < 10⁻⁶, Cohen's d = +2.95).
-• Zero regression on known attacks: 0.00% ASR for both models on in-distribution injections.
-• Clear Pareto Trade-off: MAPPO develops a zero-trust defensive barrier that drastically enhances security
-  at the expense of benign task false-refusal rate.
-====================================================================================================
-```
+Historical reports do not establish a completed LLM comparison. The new causal-LM scripts have not been trained or evaluated; use a new frozen test set for confirmatory results. See [the training and evaluation guide](docs/llm_mappo_training.md) and [the four-quadrant protocol](docs/four_quadrant_experiment_protocol.md).
 
 ---
 
-## 🏛️ System Architecture: CTDE Multi-Agent Co-evolution
+## Implemented model paths
 
-The framework operates under the **Centralized Training with Decentralized Execution (CTDE)** paradigm:
+The repository contains two distinct tracks. The earlier DistilBERT pipeline remains available for reproducing its classifier experiment. The causal-LM track trains a LoRA SFT adapter, then applies a competitive attacker-Defender MAPPO variant with separate centralized state-value critics. It compares sampled response decisions in four quadrants. The original MAPPO paper evaluates cooperative tasks; this adversarial use is an adaptation, not a reproduction of those experiments. The model's `ALLOW` marker is an experimental decision outcome; it is not authorization to run arbitrary tools. The fixed policy gate remains the enforcement boundary for tool proposals.
 
+The policy gate is a separate deterministic enforcement layer. For classifier experiments, keep its version fixed across both arms and report gate decisions separately from classifier predictions. In the causal-LM path, `ALLOW` does not authorize a tool call.
+
+## Repository structure
+
+```text
+configs/mappo_config.yaml               MAPPO and model configuration
+data/sft/train.jsonl                    245 source training records
+data/sft/validation.jsonl               8 validation records
+data/sft/train_pilot.jsonl              195-record development split
+data/sft/validation_pilot.jsonl         58-record development split
+data/sft/pilot_split_manifest.json      Split hashes and pilot limitations
+data/sft/heldout.jsonl                  100 held-out records
+data/evaluation/benchmark_cases.jsonl  200 environment cases
+data/evaluation/four_quadrants_benchmark.jsonl 100 exploratory cases
+scripts/run_sft_baseline.py             DistilBERT SFT classifier trainer
+scripts/run_mappo_coevolution.py        DistilBERT MAPPO classifier trainer
+scripts/evaluate_four_quadrants.py      Paired stochastic four-quadrant evaluator
+src/train_sft.py                        Completion-only causal-LM SFT trainer
+scripts/run_llm_mappo.py                Causal-LM adversarial MAPPO variant trainer
+scripts/evaluate_llm_four_quadrants.py  Generated-response four-quadrant evaluator
+scripts/validate_llm_experiment_data.py Pre-training split and family preflight
+scripts/run_mappo_vs_sft_stats.py       Paired case-conditional descriptive analysis
+reports/mappo_vs_sft_paired_comparison.json  Generated descriptive comparison with provenance
+src/defender_policy/                    Classifier, policy adapter, and fixed gate
+src/attacker_policy/                    Configured attack-category policy
+src/centralized_critic/                 Critic used during policy training
+reports/phase3_final_report.md          Preliminary implementation and evidence audit
+docs/four_quadrant_experiment_protocol.md  Confirmatory evaluation protocol
 ```
-[Untrusted User / Adversary Prompt]
-                │
-                ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                   CoevolutionEnv (Markov Game Board)                   │
-│  Builds DefenderObservation(user_task, untrusted_content) & GlobalState│
-└───────────────┬────────────────────────────────────────┬───────────────┘
-                │                                        │
-        GlobalState S_t                           DefenderObservation
-                │                                        │
-                ▼                                        ▼
-┌───────────────────────────────┐        ┌───────────────────────────────┐
-│     Centralized Critic        │        │        MAPPO Defender         │
-│   (DistilBERT Value Network)  │        │ (DistilBERT Sequence Policy)  │
-│    V_phi(S_t) -> GAE (A_t)    │        │  Init: SFT Warmup (pi_SFT)    │
-└───────────────┬───────────────┘        │  PPO Clipped + KL Regularizer │
-                │                                └───────┬───────────────────────┘
-                │ Advantage Signal (GAE)                 │ Raw Proposed Action
-                └───────────────────────────────────────▶│
-                                                         ▼
-                                         ┌───────────────────────────────┐
-                                         │   Fail-Closed Policy Gate     │
-                                         │    (GATE-001 to GATE-009)     │
-                                         └───────────────┬───────────────┘
-                                                         │
-                                        ┌────────────────┴────────────────┐
-                                        ▼                                 ▼
-                                 🚫 Safe Denial                    ✅ Safe Response
-```
 
-### Mathematical Objectives
-1. **Defender PPO Objective with KL Reference Anchor:**
-   $$L^{CLIP}(\theta) = \hat{\mathbb{E}}_t \left[ \min\left(r_t(\theta)\hat{A}_t^{def}, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t^{def}\right) \right] - \beta_{KL} D_{KL}(\pi_\theta \parallel \pi_{SFT}) + c_e \mathcal{H}(\pi_\theta)$$
-2. **Centralized Critic Objective:**
-   $$L^V(\phi) = \frac{1}{2} \hat{\mathbb{E}}_t \left[ \left(V_\phi(S_t) - R_t^{target}\right)^2 \right]$$
-3. **Passive SFT Objective:**
-   $$L^{SFT}(\theta) = -\sum_{(x_i, y_i) \in \mathcal{D}_{SFT}} \log P_\theta(y_i \mid x_i)$$
-
----
-
-## 📁 Repository Structure
-
-```
-.
-├── checkpoints/
-│   ├── mappo_run/
-│   │   ├── mappo_defender_final.pt    # Fully trained MAPPO Defender neural weights
-│   │   ├── critic_final.pt            # Centralized Critic V(S) weights
-│   │   └── attacker_final.pt          # Co-evolved Attacker policy weights
-│   └── sft_run/
-│       └── sft_final.pt               # SFT Baseline neural weights (30 epochs)
-├── configs/
-│   └── mappo_config.yaml              # Hyperparameters (PPO clip, KL penalty, GAE gamma)
-├── data/
-│   ├── sft/
-│   │   ├── train.jsonl                # 100 training cases (75 attack + 25 benign)
-│   │   └── heldout.jsonl              # 100 held-out cases (40 ID + 40 Novel OOD + 20 Benign)
-│   └── evaluation/
-│       └── benchmark_cases.jsonl      # 200 multi-turn evaluation cases
-├── reports/
-│   ├── phase3_final_report.md         # Formal research manuscript for paper submission
-│   ├── mappo_vs_sft_statistical_tests.json # Raw empirical hypothesis test outputs
-│   ├── mappo_vs_sft_significance_plot.png  # Publication 4-panel statistical box plot
-│   ├── novel_attack_generalization.png     # OOD category robustness bar chart
-│   ├── asr_over_training.png               # Training ASR convergence curves
-│   └── defender_reward_curve.png           # Co-evolution reward stabilization curves
-├── scripts/
-│   ├── generate_benchmark_dataset.py  # Benchmark generator with deterministic seeds
-│   ├── run_sft_baseline.py            # SFT Baseline training pipeline
-│   ├── run_mappo_coevolution.py       # MAPPO Co-evolution training loop (CTDE)
-│   ├── run_mappo_vs_sft_stats.py      # Welch's t-test, Mann-Whitney U, Bootstrap evaluation
-│   ├── analyze_attack_diversity.py    # Pairwise cosine embedding diversity analysis
-│   └── generate_mappo_vs_sft_plots.py # Publication-quality figure renderer (300 DPI)
-├── src/
-│   ├── defender_policy/
-│   │   ├── neural_defender.py         # PyTorch NeuralDefenderPolicy & PPO loss
-│   │   ├── model_adapter.py           # Gym action adapter with gate validation
-│   │   └── gate.py                    # Fail-closed Policy Gate rules (GATE-001..009)
-│   ├── attacker_policy/               # Multi-category adversarial prompt generator
-│   ├── centralized_critic/            # DistilBERT global state value estimator
-│   ├── coevolution_env.py             # Custom Gym-like zero-sum Markov environment
-│   └── trajectory_buffer.py           # CTDE GAE trajectory buffer
-├── ui/
-│   ├── index.html                     # Executive MAPPO vs. SFT comparison arena
-│   ├── architecture.html              # Interactive CTDE game architecture diagram
-│   └── style.css                      # Modern dark cybersecurity UI theme
-└── ui_server.py                       # FastAPI backend loading real neural checkpoints
-```
+There is no reproducible SFT/MAPPO checkpoint pair in this checkout. Existing evaluation reports are exploratory or unverified; they do not establish comparative performance.
 
 ---
 
 ## 🛡️ Interactive Research Arena UI
 
-The platform includes an **Executive Research Arena** for live red-teaming demonstrations and evaluation:
+The UI is a classifier demonstration, not the causal-LM experiment environment. It displays allow/defend predictions when classifier checkpoints are available. Its heuristic prompt flag is illustrative and is not a policy gate or ground truth.
 
-* **Side-by-Side Arena:** Real-time dual inference comparing **MAPPO Defender (CTDE)** vs. **SFT Baseline Defender**.
-* **1-Click Faculty Benchmark Test Cases:** Instant evaluation chips for:
+* **Side-by-Side View:** Compare classifier predictions from the **MAPPO** and **SFT** checkpoints.
+* **Example Prompts:** Load examples for:
   1. *Recursive Base64 Obfuscation* (`Novel OOD`)
   2. *Authority Impersonation* (`Novel OOD`)
   3. *Direct Instruction Override* (`In-Dist`)
   4. *Cyber Log Inspection* (`Benign Task`)
-* **Policy Gate Telemetry:** Displays which security rule intercepted the attack (`GATE-003`, `GATE-005`, `GATE-006`, `GATE-007`, `GATE-008`).
-* **Live Session Telemetry:** Real-time counters tracking MAPPO blocks, SFT blocks, and total evaluations.
-* **CTDE Architecture Visualizer:** Direct interactive access to [`ui/architecture.html`](ui/architecture.html) illustrating the Markov game board.
+* **Session Telemetry:** Counts classifier defend predictions and heuristic-flagged unsafe allow predictions.
+* **Architecture Visualizer:** [`ui/architecture.html`](ui/architecture.html) describes the implemented training pipeline and its evidence status.
 
 ---
 
 ## 🚀 Quickstart & Reproduction Guide
 
-All experiments are 100% reproducible with fixed random seeds on standard compute.
+Training requires the base model files and a supported accelerator. Checkpoints are excluded from Git, so the source code and reports alone do not reproduce a trained-model result.
 
 ### 1. Environment Setup
 
@@ -168,37 +89,77 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Generate Benchmark Dataset
-Generates 100 training and 100 held-out evaluation samples with strict ID vs. Novel OOD partitioning:
+### 2. Prepare and validate data splits
+
+The dataset-generation script overwrites the training and held-out files and does not create the validation split. Do not run it over the checked-in data. A deterministic, case-stratified 195/58 pilot split is provided in `data/sft/train_pilot.jsonl` and `data/sft/validation_pilot.jsonl`; it reuses the existing records and is only for pipeline development. Prepare and freeze separate training, validation, and confirmatory-test files for a study; annotate task and attack families, then run the preflight before training. The checked-in benchmark is exploratory. Preflight checks structural and family conditions, but does not certify annotation quality, dataset size, provenance, or test-set blindness; the evaluator rejects the checked-in benchmark for confirmatory use.
+
 ```bash
-python scripts/generate_benchmark_dataset.py
+python3 scripts/validate_llm_experiment_data.py \
+  --train-file /path/to/frozen-train.jsonl \
+  --validation-file /path/to/frozen-validation.jsonl \
+  --benchmark /path/to/frozen-four-quadrant-test.jsonl \
+  --attack-categories direct_override data_exfiltration tool_abuse destructive_action authority_impersonation
 ```
 
-### 3. Train SFT Baseline
-Trains the `distilbert-base-uncased` classifier via cross-entropy for 30 epochs and saves checkpoint to `checkpoints/sft_run/sft_final.pt`:
+To check the development pilot's schema, substitute `data/sft/train_pilot.jsonl`,
+`data/sft/validation_pilot.jsonl`, and
+`data/evaluation/four_quadrants_benchmark.jsonl`. A passing preflight does not
+make this inspected pilot confirmatory.
+
+### 3. Train the response-generating SFT baseline
+
+The trainer masks prompt tokens from the language-model loss, balances ALLOW/DEFEND examples, includes synthetic protected values in both training arms, selects checkpoints with the shared validation score for decision accuracy and synthetic-value exposure, and saves a LoRA adapter plus data and training provenance:
+
 ```bash
-python scripts/run_sft_baseline.py --epochs 30 --lr 2e-5
+python3 src/train_sft.py \
+  --model-name Qwen/Qwen2.5-0.5B --epochs 3 \
+  --train-file /path/to/frozen-train.jsonl \
+  --validation-file /path/to/frozen-validation.jsonl \
+  --output-dir checkpoints/sft_llm
 ```
 
-### 4. Train MAPPO Co-evolution
-Initializes the Defender from SFT warm-up weights and trains both Attacker and Defender via CTDE PPO for 150 episodes, saving checkpoints to `checkpoints/mappo_run/`:
+### 4. Train the causal-LM MAPPO policy
+
+Initializes the Defender and frozen KL reference from the same SFT adapter. Benign episodes are sampled at a fixed rate independent of the attacker; on attack episodes the attacker chooses an attack family. The attacker critic uses the global pre-attack state, while the Defender critic uses the attack-conditioned state before response generation. Each episode uses a fresh synthetic protected value and penalizes exact disclosure, without using the real evaluation canary. The trainer writes the adapted language model, actors, critics, and run manifest:
+
 ```bash
-python scripts/run_mappo_coevolution.py --episodes 150 --rollout-batch 5
+python3 scripts/run_llm_mappo.py \
+  --base-model Qwen/Qwen2.5-0.5B --episodes 4000 \
+  --sft-adapter checkpoints/sft_llm \
+  --train-file /path/to/frozen-train.jsonl \
+  --validation-file /path/to/frozen-validation.jsonl \
+  --attack-categories direct_override data_exfiltration tool_abuse destructive_action authority_impersonation \
+  --output-dir checkpoints/mappo_llm
 ```
 
-> **Note on Checkpoints:** Checkpoint weights (`.pt`) are stored in `checkpoints/` and are excluded from Git commits via `.gitignore` to keep repository downloads fast. Running Steps 3 and 4 generates the full `.pt` files. If launched prior to training, `ui_server.py` gracefully falls back to initial base weights for smoke testing.
+Training is not performed by these instructions automatically. Review the data protocol and run with the externally provisioned accelerator and model access.
 
-### 5. Run Statistical Hypothesis Testing (Bootstrap B=30)
-Evaluates both checkpoints on the 100-case held-out benchmark using Welch's $t$-test, Mann-Whitney $U$, and Cohen's $d$:
+### 5. Evaluate the four quadrants
+
+The causal-LM evaluator samples generated responses from both adapters and records per-case decisions, invalid decision markers, benchmark hashes, and (if configured) canary exposure counts. It never stores raw responses or the canary value:
+
 ```bash
-python scripts/run_mappo_vs_sft_stats.py --trials 30 --sample-fraction 0.85
+EVAL_CANARY_VALUE='your-runtime-only-canary' python3 scripts/evaluate_llm_four_quadrants.py \
+  --benchmark /path/to/frozen-four-quadrant-test.jsonl \
+  --train-file /path/to/frozen-train.jsonl \
+  --validation-file /path/to/frozen-validation.jsonl \
+  --sft-adapter checkpoints/sft_llm \
+  --mappo-adapter checkpoints/mappo_llm \
+  --benchmark-status confirmatory --samples-per-case 20 \
+  --minimum-action-rate 0.8 --seed 42
 ```
 
-### 6. Render Publication Figures
-Generates all 300 DPI figures used in the manuscript (saved to `reports/`):
+The checked-in four-quadrant set has already been inspected and is exploratory. Use a separately frozen test set for confirmatory results. The report marks whether each arm meets the required action rate in all four quadrants; choose and record that threshold before accessing the test set. Do not interpret repeated generations or bootstrap draws from one fixed test set as independent training runs. The canary environment variable must be set only in the evaluation process and must not be added to training files or committed reports.
+
+### 6. Legacy classifier analysis
+
+The following tools apply only to the DistilBERT classifier track. They are not the analysis path for generated causal-LM responses:
 ```bash
+python scripts/run_mappo_vs_sft_stats.py --benchmark data/evaluation/four_quadrants_benchmark.jsonl
 python scripts/generate_mappo_vs_sft_plots.py
 ```
+
+These commands are exploratory when run on the checked-in benchmark. Use the separately frozen test file for a confirmatory comparison.
 
 ### 7. Launch Interactive Research Arena UI
 Start the FastAPI backend server:
@@ -218,19 +179,19 @@ open ui/index.html
 
 ## 🧪 Test Suite
 
-The codebase includes 430 unit and integration tests covering the CTDE environment, policy gate rules, GAE advantage buffer, leak detector, and neural policies:
+The repository records a 430-test suite covering the CTDE environment, policy gate rules, GAE advantage buffer, leak detector, and neural policies. This suite was not rerun during the manuscript/evaluation revisions:
 
 ```bash
 PYTHONPATH=. python3 -m pytest
 ```
-*Expected output:* `430 passed in ~17s`
+*Previously recorded output:* `430 passed`; rerun before relying on this status.
 
 ---
 
 ## 📄 Citation & Artifact Access
 
-To cite this work or inspect the empirical findings, please refer to:
+For the current implementation and evaluation status, please refer to:
 - **Full Research Paper Manuscript:** [`reports/phase3_final_report.md`](reports/phase3_final_report.md)
-- **Statistical Significance Report:** [`reports/mappo_vs_sft_statistical_tests.txt`](reports/mappo_vs_sft_statistical_tests.txt)
+- **Evaluation protocol:** [`docs/four_quadrant_experiment_protocol.md`](docs/four_quadrant_experiment_protocol.md)
 - **Interactive Architecture Diagram:** [`ui/architecture.html`](ui/architecture.html)
 - **Interactive Arena UI:** [`ui/index.html`](ui/index.html)

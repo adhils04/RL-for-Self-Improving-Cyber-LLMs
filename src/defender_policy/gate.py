@@ -89,8 +89,29 @@ class PolicyGate:
 
     # ── Public API ────────────────────────────────────────────────────────
 
-    def execute(self, call: ToolCall) -> GateResult:
-        """Validate, authorize, and (if allowed) execute ``call``."""
+    def execute(self, call: ToolCall, decision: Optional[str] = None) -> GateResult:
+        """Validate, authorize, and (if allowed) execute ``call``.
+
+        A model decision of ``DEFEND`` fails closed before tool execution.
+        ``ALLOW`` still proceeds through every existing gate rule.
+        """
+
+        if decision is not None:
+            normalized_decision = decision.strip().upper() if isinstance(decision, str) else ""
+            if normalized_decision not in {"ALLOW", "DEFEND"}:
+                return self._deny(
+                    call.tool if isinstance(call.tool, str) and call.tool else "invalid_tool",
+                    rule_id="GATE-010",
+                    reason_code="invalid_model_decision",
+                    safe_message="The model did not provide a valid execution decision.",
+                )
+            if normalized_decision == "DEFEND":
+                return self._deny(
+                    call.tool if isinstance(call.tool, str) and call.tool else "invalid_tool",
+                    rule_id="GATE-010",
+                    reason_code="model_defended_execution",
+                    safe_message="The model's decision prevented tool execution.",
+                )
 
         # 1. Structural checks — tool name
         if not isinstance(call.tool, str) or not call.tool:

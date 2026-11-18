@@ -26,6 +26,7 @@ from defender_policy.model_adapter import (  # noqa: E402
     FixtureModelAdapter,
     RawModelOutput,
     SFTModelAdapter,
+    build_prompt,
 )
 from defender_policy.rewards import (  # noqa: E402
     RewardWeights,
@@ -221,7 +222,8 @@ class TestSFTModelAdapterParsing(unittest.TestCase):
             allowed_action_schema="gate-v1",
         )
         prompt = SFTModelAdapter._build_prompt(obs)
-        self.assertEqual(prompt, "User: Summarize this incident note.\nAssistant:")
+        self.assertEqual(prompt, build_prompt(obs.user_task, obs.untrusted_content))
+        self.assertIn("DECISION: ALLOW or DECISION: DEFEND", prompt)
 
     def test_build_prompt_includes_untrusted_content_block(self) -> None:
         obs = DefenderObservation(
@@ -255,6 +257,21 @@ class TestSFTModelAdapterParsing(unittest.TestCase):
         self.assertIsNone(out.tool_name)
         self.assertEqual(out.log_prob, -3.2)
         self.assertEqual(out.entropy, 0.4)
+
+    def test_parse_completion_extracts_decision_and_body(self) -> None:
+        out = SFTModelAdapter._parse_completion(
+            "DECISION: DEFEND\nI will summarize the content safely.", -1.0, 0.2
+        )
+        self.assertEqual(out.decision, "DEFEND")
+        self.assertEqual(out.text, "I will summarize the content safely.")
+
+    def test_parse_completion_without_decision_is_invalid(self) -> None:
+        out = SFTModelAdapter._parse_completion(
+            '<tool_call>{"tool":"get_document","arguments":{"document_id":"doc_102"},'
+            '"purpose":"Retrieve the requested incident document"}</tool_call>', -1.0, 0.2
+        )
+        self.assertEqual(out.decision, "INVALID")
+        self.assertEqual(out.tool_name, "get_document")
 
     def test_parse_completion_extracts_tool_call(self) -> None:
         completion = (
@@ -338,6 +355,16 @@ class TestRolloutAdapterTextAnswer(unittest.TestCase):
         self.assertIsNone(step.action.tool_call)
         self.assertEqual(step.action.answer_text, "All services are healthy.")
 
+    def test_invalid_text_decision_fails_closed(self) -> None:
+        obs = _make_obs()
+        raw = RawModelOutput(text="Potentially unsafe generated text.", decision="INVALID")
+        step = self.adapter.step(obs, raw)
+        self.assertEqual(
+            step.action.answer_text,
+            "I cannot safely complete this request without a valid decision.",
+        )
+        self.assertEqual(step.action.decision, "INVALID")
+
     def test_text_answer_carries_log_prob(self) -> None:
         obs = _make_obs()
         raw = RawModelOutput(text="Summary.", tool_name=None, log_prob=-3.5, entropy=0.7)
@@ -375,6 +402,43 @@ class TestRolloutAdapterToolCall(unittest.TestCase):
         step = self.adapter.step(obs, raw)
         self.assertTrue(step.action.gate_result.allowed)
         self.assertIsNotNone(step.action.gate_result.data)
+
+    def test_defend_decision_blocks_allowlisted_tool(self) -> None:
+        obs = _make_obs(user_task="Retrieve document doc_102.")
+        raw = RawModelOutput(
+            text="", tool_name="get_document",
+            tool_args={"document_id": "doc_102"},
+            tool_purpose="Retrieve the requested incident document",
+            decision="DEFEND",
+        )
+        step = self.adapter.step(obs, raw)
+        self.assertFalse(step.action.gate_result.allowed)
+        self.assertIsNone(step.action.gate_result.data)
+        self.assertEqual(step.action.decision, "DEFEND")
+
+    def test_invalid_decision_blocks_tool_proposal(self) -> None:
+        obs = _make_obs(user_task="Retrieve document doc_102.")
+        raw = SFTModelAdapter._parse_completion(
+            'DECISION: MAYBE\n<tool_call>{"tool":"get_document",'
+            '"arguments":{"document_id":"doc_102"},'
+            '"purpose":"Retrieve the requested incident document"}</tool_call>', -1.0, 0.2
+        )
+        step = self.adapter.step(obs, raw)
+        self.assertFalse(step.action.gate_result.allowed)
+        self.assertIsNone(step.action.gate_result.data)
+        self.assertEqual(step.action.gate_result.decision.reason_code, "invalid_model_decision")
+
+    def test_allow_decision_still_uses_gate(self) -> None:
+        obs = _make_obs(user_task="Retrieve document doc_102.")
+        raw = RawModelOutput(
+            text="", tool_name="get_document",
+            tool_args={"document_id": "doc_102"},
+            tool_purpose="Retrieve the requested incident document",
+            decision="ALLOW",
+        )
+        step = self.adapter.step(obs, raw)
+        self.assertTrue(step.action.gate_result.allowed)
+        self.assertEqual(step.action.decision, "ALLOW")
 
     def test_unallowlisted_tool_is_blocked(self) -> None:
         obs = _make_obs()

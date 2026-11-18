@@ -1,0 +1,34 @@
+{
+  "status": "exploratory_pipeline_pilot",
+  "split_method": "Deterministic case-level stratification of the existing training records by label and benign task_family or attack_family.",
+  "random_seed": 42,
+  "target_validation_fraction": 0.2,
+  "stratum_rule": "Retain at least one record from each stratum in training; append the original eight validation records to the pilot validation split.",
+  "records": {
+    "train_pilot": 195,
+    "validation_pilot": 58,
+    "benchmark": 100,
+    "moved_from_original_train_to_validation": 50
+  },
+  "task_family_annotation": "Draft semantic labels. Training and validation labels were assigned from task wording using explicit keyword rules; Q1 labels were assigned by content family; five Q3 families were manually curated after reviewing the training data. Independent review is required.",
+  "limitations": [
+    "The pilot split is case-separated but not source-independent.",
+    "The benchmark is checked in, inspected, and unsuitable for confirmatory claims.",
+    "The pilot validation set is for pipeline development and does not establish reliable checkpoint selection.",
+    "No model training or evaluation results are included."
+  ],
+  "sha256": {
+    "source_train": "5789b9c6a54403b9ebe3a16320ef8873b85b56ca10579dec76ed6d350c16f103",
+    "source_validation": "3046c4dc7de791880fd7dbd1cb66391565046af063447c2e46358f88f93c9f8e",
+    "train_pilot": "b02edd127a653dfa22076240503ca92406b233519b6cd19688bbd5d8271de49b",
+    "validation_pilot": "04fabf30fd250a7df08552e19455898bfb9d341f5a971b66b8981fec0708eb04",
+    "exploratory_benchmark": "f5d2e4d3c012f4aeda100ec84c7aa468a2e4fb2a3e05eee010ddbc26e6436583"
+  },
+  "files": {
+    "source_train": "data/sft/train.jsonl",
+    "source_validation": "data/sft/validation.jsonl",
+    "train_pilot": "data/sft/train_pilot.jsonl",
+    "validation_pilot": "data/sft/validation_pilot.jsonl",
+    "exploratory_benchmark": "data/evaluation/four_quadrants_benchmark.jsonl"
+  }
+}

@@ -157,5 +157,10 @@
     "sft_total_accuracy_pct": 78.0,
     "mappo_total_accuracy_pct": 91.0,
     "accuracy_advantage_pct": 13.0
-  }
+  },
+  "evidence_status": "exploratory_legacy_report",
+  "limitations": "This report predates checkpoint hashing and is based on a benchmark already inspected during project development. It is not confirmatory evidence. The report lacks checkpoint hashes and predates correction of empty user_task context; it cannot serve as evidence for the current generative-LM benchmark.",
+  "model_type": "DistilBERT binary sequence classifier",
+  "benchmark_sha256": "a1eb5a6c512aba0decd2ce78a55eee1bb6ee14273b351f518d854f4dcb780c1f",
+  "benchmark_context": "Historical version with empty user_task fields; does not match the corrected exploratory benchmark."
 }
