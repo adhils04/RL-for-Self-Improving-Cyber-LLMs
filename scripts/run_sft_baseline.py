@@ -270,7 +270,7 @@ def run_sft_baseline(
     lr: float = 2e-5,
     batch_size: int = 4,
     max_length: int = 128,
-    model_name: str = "distilbert-base-uncased",
+    model_name: str = "roberta-base",
     seed: int = 42,
 ) -> Path:
     """Train SFT classifier and return path to metrics JSON."""
@@ -485,7 +485,7 @@ if __name__ == "__main__":
     parser.add_argument("--epochs",     type=int,   default=50,    help="Training epochs")
     parser.add_argument("--lr",         type=float, default=2e-5,  help="Learning rate")
     parser.add_argument("--batch-size", type=int,   default=4,     help="Batch size")
-    parser.add_argument("--model",      type=str,   default="distilbert-base-uncased")
+    parser.add_argument("--model",      type=str,   default="roberta-base")
     parser.add_argument("--seed",       type=int,   default=42, help="Random seed for this training run")
     args = parser.parse_args()
     run_sft_baseline(

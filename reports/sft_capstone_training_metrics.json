@@ -1,11 +1,11 @@
 {
   "run_metadata": {
-    "generated_at": "2026-11-18T17:36:49.577229+00:00",
+    "generated_at": "2026-11-19T04:45:06.283676+00:00",
     "algorithm": "SFT (Supervised Fine-Tuning)",
-    "model": "distilbert-base-uncased",
-    "n_epochs": 2,
-    "lr": 5e-05,
-    "batch_size": 4,
+    "model": "roberta-base",
+    "n_epochs": 15,
+    "lr": 2e-05,
+    "batch_size": 8,
     "train_examples": 100,
     "dev_examples": 20,
     "test_examples": 100,
@@ -15,10 +15,150 @@
   "history": [
     {
       "epoch": 1,
-      "train_loss": 0.310163,
-      "train_accuracy": 0.88,
+      "train_loss": 0.59759,
+      "train_accuracy": 0.65,
+      "dev_accuracy": 0.75,
+      "test_accuracy": 0.65,
+      "dev_per_quadrant": {
+        "Q1_common_benign": {
+          "correct": 5,
+          "total": 10
+        },
+        "Q2_common_injection": {
+          "correct": 10,
+          "total": 10
+        }
+      },
+      "test_per_quadrant": {
+        "Q3_unique_benign": {
+          "correct": 0,
+          "total": 25
+        },
+        "Q4_unique_injection": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q1_common_benign": {
+          "correct": 15,
+          "total": 25
+        },
+        "Q2_common_injection": {
+          "correct": 25,
+          "total": 25
+        }
+      }
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.333966,
+      "train_accuracy": 0.83,
+      "dev_accuracy": 0.9,
+      "test_accuracy": 0.78,
+      "dev_per_quadrant": {
+        "Q1_common_benign": {
+          "correct": 8,
+          "total": 10
+        },
+        "Q2_common_injection": {
+          "correct": 10,
+          "total": 10
+        }
+      },
+      "test_per_quadrant": {
+        "Q3_unique_benign": {
+          "correct": 19,
+          "total": 25
+        },
+        "Q4_unique_injection": {
+          "correct": 13,
+          "total": 25
+        },
+        "Q1_common_benign": {
+          "correct": 21,
+          "total": 25
+        },
+        "Q2_common_injection": {
+          "correct": 25,
+          "total": 25
+        }
+      }
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.040842,
+      "train_accuracy": 0.98,
+      "dev_accuracy": 1.0,
+      "test_accuracy": 0.76,
+      "dev_per_quadrant": {
+        "Q1_common_benign": {
+          "correct": 10,
+          "total": 10
+        },
+        "Q2_common_injection": {
+          "correct": 10,
+          "total": 10
+        }
+      },
+      "test_per_quadrant": {
+        "Q3_unique_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q4_unique_injection": {
+          "correct": 1,
+          "total": 25
+        },
+        "Q1_common_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q2_common_injection": {
+          "correct": 25,
+          "total": 25
+        }
+      }
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.001829,
+      "train_accuracy": 1.0,
+      "dev_accuracy": 1.0,
+      "test_accuracy": 0.83,
+      "dev_per_quadrant": {
+        "Q1_common_benign": {
+          "correct": 10,
+          "total": 10
+        },
+        "Q2_common_injection": {
+          "correct": 10,
+          "total": 10
+        }
+      },
+      "test_per_quadrant": {
+        "Q3_unique_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q4_unique_injection": {
+          "correct": 8,
+          "total": 25
+        },
+        "Q1_common_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q2_common_injection": {
+          "correct": 25,
+          "total": 25
+        }
+      }
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.000754,
+      "train_accuracy": 1.0,
       "dev_accuracy": 0.95,
-      "test_accuracy": 0.81,
+      "test_accuracy": 0.84,
       "dev_per_quadrant": {
         "Q1_common_benign": {
           "correct": 9,
@@ -31,15 +171,15 @@
       },
       "test_per_quadrant": {
         "Q3_unique_benign": {
-          "correct": 18,
+          "correct": 25,
           "total": 25
         },
         "Q4_unique_injection": {
-          "correct": 15,
+          "correct": 9,
           "total": 25
         },
         "Q1_common_benign": {
-          "correct": 23,
+          "correct": 25,
           "total": 25
         },
         "Q2_common_injection": {
@@ -49,8 +189,78 @@
       }
     },
     {
-      "epoch": 2,
-      "train_loss": 0.007274,
+      "epoch": 6,
+      "train_loss": 0.000432,
+      "train_accuracy": 1.0,
+      "dev_accuracy": 0.95,
+      "test_accuracy": 0.84,
+      "dev_per_quadrant": {
+        "Q1_common_benign": {
+          "correct": 9,
+          "total": 10
+        },
+        "Q2_common_injection": {
+          "correct": 10,
+          "total": 10
+        }
+      },
+      "test_per_quadrant": {
+        "Q3_unique_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q4_unique_injection": {
+          "correct": 9,
+          "total": 25
+        },
+        "Q1_common_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q2_common_injection": {
+          "correct": 25,
+          "total": 25
+        }
+      }
+    },
+    {
+      "epoch": 7,
+      "train_loss": 0.000308,
+      "train_accuracy": 1.0,
+      "dev_accuracy": 1.0,
+      "test_accuracy": 0.84,
+      "dev_per_quadrant": {
+        "Q1_common_benign": {
+          "correct": 10,
+          "total": 10
+        },
+        "Q2_common_injection": {
+          "correct": 10,
+          "total": 10
+        }
+      },
+      "test_per_quadrant": {
+        "Q3_unique_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q4_unique_injection": {
+          "correct": 9,
+          "total": 25
+        },
+        "Q1_common_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q2_common_injection": {
+          "correct": 25,
+          "total": 25
+        }
+      }
+    },
+    {
+      "epoch": 8,
+      "train_loss": 0.000296,
       "train_accuracy": 1.0,
       "dev_accuracy": 1.0,
       "test_accuracy": 0.82,
@@ -66,11 +276,256 @@
       },
       "test_per_quadrant": {
         "Q3_unique_benign": {
-          "correct": 24,
+          "correct": 25,
           "total": 25
         },
         "Q4_unique_injection": {
-          "correct": 8,
+          "correct": 7,
+          "total": 25
+        },
+        "Q1_common_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q2_common_injection": {
+          "correct": 25,
+          "total": 25
+        }
+      }
+    },
+    {
+      "epoch": 9,
+      "train_loss": 0.000249,
+      "train_accuracy": 1.0,
+      "dev_accuracy": 1.0,
+      "test_accuracy": 0.82,
+      "dev_per_quadrant": {
+        "Q1_common_benign": {
+          "correct": 10,
+          "total": 10
+        },
+        "Q2_common_injection": {
+          "correct": 10,
+          "total": 10
+        }
+      },
+      "test_per_quadrant": {
+        "Q3_unique_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q4_unique_injection": {
+          "correct": 7,
+          "total": 25
+        },
+        "Q1_common_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q2_common_injection": {
+          "correct": 25,
+          "total": 25
+        }
+      }
+    },
+    {
+      "epoch": 10,
+      "train_loss": 0.000213,
+      "train_accuracy": 1.0,
+      "dev_accuracy": 1.0,
+      "test_accuracy": 0.82,
+      "dev_per_quadrant": {
+        "Q1_common_benign": {
+          "correct": 10,
+          "total": 10
+        },
+        "Q2_common_injection": {
+          "correct": 10,
+          "total": 10
+        }
+      },
+      "test_per_quadrant": {
+        "Q3_unique_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q4_unique_injection": {
+          "correct": 7,
+          "total": 25
+        },
+        "Q1_common_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q2_common_injection": {
+          "correct": 25,
+          "total": 25
+        }
+      }
+    },
+    {
+      "epoch": 11,
+      "train_loss": 0.000206,
+      "train_accuracy": 1.0,
+      "dev_accuracy": 1.0,
+      "test_accuracy": 0.82,
+      "dev_per_quadrant": {
+        "Q1_common_benign": {
+          "correct": 10,
+          "total": 10
+        },
+        "Q2_common_injection": {
+          "correct": 10,
+          "total": 10
+        }
+      },
+      "test_per_quadrant": {
+        "Q3_unique_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q4_unique_injection": {
+          "correct": 7,
+          "total": 25
+        },
+        "Q1_common_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q2_common_injection": {
+          "correct": 25,
+          "total": 25
+        }
+      }
+    },
+    {
+      "epoch": 12,
+      "train_loss": 0.000178,
+      "train_accuracy": 1.0,
+      "dev_accuracy": 1.0,
+      "test_accuracy": 0.82,
+      "dev_per_quadrant": {
+        "Q1_common_benign": {
+          "correct": 10,
+          "total": 10
+        },
+        "Q2_common_injection": {
+          "correct": 10,
+          "total": 10
+        }
+      },
+      "test_per_quadrant": {
+        "Q3_unique_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q4_unique_injection": {
+          "correct": 7,
+          "total": 25
+        },
+        "Q1_common_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q2_common_injection": {
+          "correct": 25,
+          "total": 25
+        }
+      }
+    },
+    {
+      "epoch": 13,
+      "train_loss": 0.000164,
+      "train_accuracy": 1.0,
+      "dev_accuracy": 1.0,
+      "test_accuracy": 0.82,
+      "dev_per_quadrant": {
+        "Q1_common_benign": {
+          "correct": 10,
+          "total": 10
+        },
+        "Q2_common_injection": {
+          "correct": 10,
+          "total": 10
+        }
+      },
+      "test_per_quadrant": {
+        "Q3_unique_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q4_unique_injection": {
+          "correct": 7,
+          "total": 25
+        },
+        "Q1_common_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q2_common_injection": {
+          "correct": 25,
+          "total": 25
+        }
+      }
+    },
+    {
+      "epoch": 14,
+      "train_loss": 0.000152,
+      "train_accuracy": 1.0,
+      "dev_accuracy": 1.0,
+      "test_accuracy": 0.82,
+      "dev_per_quadrant": {
+        "Q1_common_benign": {
+          "correct": 10,
+          "total": 10
+        },
+        "Q2_common_injection": {
+          "correct": 10,
+          "total": 10
+        }
+      },
+      "test_per_quadrant": {
+        "Q3_unique_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q4_unique_injection": {
+          "correct": 7,
+          "total": 25
+        },
+        "Q1_common_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q2_common_injection": {
+          "correct": 25,
+          "total": 25
+        }
+      }
+    },
+    {
+      "epoch": 15,
+      "train_loss": 0.00014,
+      "train_accuracy": 1.0,
+      "dev_accuracy": 1.0,
+      "test_accuracy": 0.82,
+      "dev_per_quadrant": {
+        "Q1_common_benign": {
+          "correct": 10,
+          "total": 10
+        },
+        "Q2_common_injection": {
+          "correct": 10,
+          "total": 10
+        }
+      },
+      "test_per_quadrant": {
+        "Q3_unique_benign": {
+          "correct": 25,
+          "total": 25
+        },
+        "Q4_unique_injection": {
+          "correct": 7,
           "total": 25
         },
         "Q1_common_benign": {

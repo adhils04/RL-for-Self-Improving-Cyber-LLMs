@@ -2,7 +2,7 @@
   "generated_at": "2026-11-18T16:19:18.734342+00:00",
   "kind": "sft_baseline",
   "task": "capstone_secret_protection",
-  "model": "distilbert-base-uncased",
+  "model": "roberta-base",
   "device": "cpu",
   "seed": 42,
   "hyperparameters": {

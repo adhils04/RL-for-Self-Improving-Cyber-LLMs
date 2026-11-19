@@ -170,7 +170,7 @@ def main() -> None:
     parser.add_argument("--train-file", type=Path, default=ROOT / "data/sft/train.jsonl")
     parser.add_argument("--validation-file", type=Path, default=ROOT / "data/sft/validation.jsonl")
     parser.add_argument("--output-dir", type=Path, default=ROOT / "checkpoints/mappo_llm")
-    parser.add_argument("--critic-model", default="distilbert-base-uncased")
+    parser.add_argument("--critic-model", default="roberta-base")
     parser.add_argument("--critic-revision", default=None)
     parser.add_argument("--attack-categories", nargs="+", choices=ATTACK_CATEGORIES,
                         default=list(DEFAULT_ATTACK_CATEGORIES),

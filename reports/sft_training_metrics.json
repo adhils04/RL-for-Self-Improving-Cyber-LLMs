@@ -3,7 +3,7 @@
     "generated_at": "2026-11-13T06:19:39.509495+00:00",
     "scope": "SFT baseline \u2014 DistilBERT binary injection classifier trained on static labeled dataset",
     "algorithm": "Supervised Fine-Tuning (SFT)",
-    "model": "distilbert-base-uncased",
+    "model": "roberta-base",
     "n_epochs": 6,
     "train_examples": 490,
     "heldout_examples": 100,

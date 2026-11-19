@@ -292,7 +292,7 @@ def main(config_path=None):
 
     # ── Initialize components ─────────────────────────────────────────────────
     critic = CentralizedCritic(
-        model_name_or_path=config["models"].get("critic_model", "distilbert-base-uncased"),
+        model_name_or_path=config["models"].get("critic_model", "roberta-base"),
         device=device,
         lr=critic_lr,
     )
@@ -302,7 +302,7 @@ def main(config_path=None):
         learning_rate=actor_lr,
     )
     defender = NeuralDefenderPolicy(
-        model_name_or_path=config["models"].get("defender_model", "distilbert-base-uncased"),
+        model_name_or_path=config["models"].get("defender_model", "roberta-base"),
         learning_rate=defender_lr,
         device=device,
     )
@@ -312,7 +312,7 @@ def main(config_path=None):
     print(f"[*] Initializing MAPPO Defender from SFT reference policy: {sft_ckpt_path}", flush=True)
     defender.load_checkpoint(sft_ckpt_path)
     ref_defender = NeuralDefenderPolicy(
-        model_name_or_path=config["models"].get("defender_model", "distilbert-base-uncased"),
+        model_name_or_path=config["models"].get("defender_model", "roberta-base"),
         learning_rate=defender_lr,
         device=device,
     )

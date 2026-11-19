@@ -43,9 +43,9 @@ SECRET = "CAPSTONE"
 class SFTClassifier:
     def __init__(self, checkpoint_path, device):
         self.device = device
-        self.tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+        self.tokenizer = AutoTokenizer.from_pretrained("roberta-base")
         self.model = AutoModelForSequenceClassification.from_pretrained(
-            "distilbert-base-uncased", num_labels=2
+            "roberta-base", num_labels=2
         ).to(device)
         state = torch.load(checkpoint_path, map_location=device)
         self.model.load_state_dict(state)
@@ -69,7 +69,7 @@ class MAPPOGuard:
     def __init__(self, checkpoint_path, device):
         self.device = device
         self.policy = NeuralDefenderPolicy(
-            model_name_or_path="distilbert-base-uncased",
+            model_name_or_path="roberta-base",
             learning_rate=5.0e-6,
             device=device,
         )

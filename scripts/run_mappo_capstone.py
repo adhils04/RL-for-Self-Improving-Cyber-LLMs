@@ -152,7 +152,7 @@ def main():
     batch_episodes = 5
 
     critic = CentralizedCritic(
-        model_name_or_path="distilbert-base-uncased",
+        model_name_or_path="roberta-base",
         device=device,
         lr=args.critic_lr,
     )
@@ -162,7 +162,7 @@ def main():
         learning_rate=args.actor_lr,
     )
     defender = NeuralDefenderPolicy(
-        model_name_or_path="distilbert-base-uncased",
+        model_name_or_path="roberta-base",
         learning_rate=args.defender_lr,
         device=device,
     )
@@ -174,7 +174,7 @@ def main():
         print(f"[MAPPO] Warm-starting defender from SFT: {sft_ckpt}", flush=True)
         defender.load_checkpoint(str(sft_ckpt))
         ref_defender = NeuralDefenderPolicy(
-            model_name_or_path="distilbert-base-uncased",
+            model_name_or_path="roberta-base",
             learning_rate=args.defender_lr,
             device=device,
         )

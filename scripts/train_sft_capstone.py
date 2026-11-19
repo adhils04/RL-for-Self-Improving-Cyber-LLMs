@@ -126,9 +126,9 @@ def main():
         device = "cpu"
     print(f"[SFT] Device: {device}", flush=True)
 
-    tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+    tokenizer = AutoTokenizer.from_pretrained("roberta-base")
     model = AutoModelForSequenceClassification.from_pretrained(
-        "distilbert-base-uncased", num_labels=2
+        "roberta-base", num_labels=2
     ).to(device)
 
     train_ds = CapstoneDataset(TRAIN_PATH, tokenizer, args.max_length)
@@ -210,7 +210,7 @@ def main():
         "run_metadata": {
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "algorithm": "SFT (Supervised Fine-Tuning)",
-            "model": "distilbert-base-uncased",
+            "model": "roberta-base",
             "n_epochs": args.epochs,
             "lr": args.lr,
             "batch_size": args.batch_size,

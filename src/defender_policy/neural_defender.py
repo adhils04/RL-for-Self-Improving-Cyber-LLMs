@@ -34,7 +34,7 @@ class NeuralDefenderPolicy(nn.Module):
 
     def __init__(
         self,
-        model_name_or_path: str = "distilbert-base-uncased",
+        model_name_or_path: str = "roberta-base",
         learning_rate: float = 2e-5,
         device: Optional[str] = None,
         max_length: int = 128,

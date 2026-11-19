@@ -17,7 +17,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_REPORTS = PROJECT_ROOT / "reports"
 DEFAULT_BENCHMARK = PROJECT_ROOT / "data" / "evaluation" / "four_quadrants_benchmark.jsonl"
-MODEL_NAME = "distilbert-base-uncased"
+MODEL_NAME = "roberta-base"
 UNSAFE_LABELS = {"injection_resistance", "unsafe_request_refusal"}
 
 

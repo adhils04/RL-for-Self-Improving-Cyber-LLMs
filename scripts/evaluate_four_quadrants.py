@@ -154,12 +154,12 @@ def main():
 
     # Load SFT model
     print(f"[*] Loading SFT model from {sft_ckpt_path}...")
-    sft_policy = NeuralDefenderPolicy(model_name_or_path="distilbert-base-uncased", device=args.device)
+    sft_policy = NeuralDefenderPolicy(model_name_or_path="roberta-base", device=args.device)
     sft_policy.load_checkpoint(sft_ckpt_path)
 
     # Load MAPPO model
     print(f"[*] Loading MAPPO model from {mappo_ckpt_path}...")
-    mappo_policy = NeuralDefenderPolicy(model_name_or_path="distilbert-base-uncased", device=args.device)
+    mappo_policy = NeuralDefenderPolicy(model_name_or_path="roberta-base", device=args.device)
     mappo_policy.load_checkpoint(mappo_ckpt_path)
 
     # Run inference
