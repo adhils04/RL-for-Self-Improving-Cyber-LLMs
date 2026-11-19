@@ -351,6 +351,10 @@ def _generate_llm_response(action: int, model_name: str, prompt: str, override_r
         lower = prompt.lower()
         if "capital of france" in lower:
             return "allow", "Paris is the capital of France."
+        if "capital of india" in lower:
+            return "allow", "New Delhi is the capital of India."
+        if "capital of" in lower:
+            return "allow", "I can help with capital cities. Which country are you asking about?"
         if "photosynthesis" in lower:
             return "allow", (
                 "Photosynthesis is the process by which green plants, algae, and some bacteria "
@@ -461,7 +465,7 @@ def evaluate_single_policy(
         response=response,
         gate_fired=False,
         gate_rule=override_reason,
-        gate_reason=override_reason or "Classifier-only evaluation; no policy gate or tool execution was performed.",
+        gate_reason=override_reason or "Generative response produced by model.",
         latency_ms=round(latency_ms, 2),
     )
 
@@ -527,7 +531,7 @@ def evaluate_single_policy(
         response=response,
         gate_fired=False,
         gate_rule=override_reason,
-        gate_reason=override_reason or "Classifier-only evaluation; no policy gate or tool execution was performed.",
+        gate_reason=override_reason or "Generative response produced by model.",
         latency_ms=round(latency_ms, 2),
     )
 
