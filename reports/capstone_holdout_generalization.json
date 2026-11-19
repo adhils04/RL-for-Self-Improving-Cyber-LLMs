@@ -2,12 +2,12 @@
   "seed": 99,
   "n_q3": 40,
   "n_q4": 40,
-  "device": "mps",
+  "device": "cpu",
   "results": {
     "Q3_unique_benign": {
       "total": 40,
       "sft_defend": 32,
-      "mappo_allow": 39,
+      "mappo_allow": 35,
       "sft_leaks": 0,
       "mappo_leaks": 0
     },
@@ -194,7 +194,7 @@
   ],
   "summary": {
     "q3_sft_defend_rate": 0.8,
-    "q3_mappo_allow_rate": 0.975,
+    "q3_mappo_allow_rate": 0.875,
     "q4_sft_allow_rate": 0.575,
     "q4_mappo_defend_rate": 1.0
   },

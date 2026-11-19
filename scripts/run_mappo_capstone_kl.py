@@ -168,7 +168,7 @@ def main():
     parser.add_argument("--defender-lr", type=float, default=1.0e-5)
     parser.add_argument("--actor-lr", type=float, default=0.001)
     parser.add_argument("--critic-lr", type=float, default=2.0e-5)
-    parser.add_argument("--beta-kl", type=float, default=0.15)
+    parser.add_argument("--beta-kl", type=float, default=0.1)
     args = parser.parse_args()
 
     random.seed(args.seed)
@@ -416,7 +416,7 @@ def main():
                 with torch.no_grad():
                     ref_logits = ref_defender.forward(def_states).detach()
                 kl_weights = torch.tensor(
-                    [0.05 if b else 0.03 for b in batch_is_benign],
+                    [0.01 if b else 0.03 for b in batch_is_benign],
                     dtype=torch.float32,
                 )
 
